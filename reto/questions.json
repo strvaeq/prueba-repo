@@ -1,0 +1,665 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "step": 0,
+      "title": "Instalar y preparar",
+      "questions": [
+        {
+          "q": "Abres una terminal nueva y ros2 run my_open drive no encuentra el paquete, aunque ya compilaste. ¿Qué falta?",
+          "options": [
+            "Volver a compilar con colcon build",
+            "Instalar ROS 2 y Gazebo otra vez",
+            "Correr rosdep install en src",
+            "Hacer source install/setup.bash"
+          ],
+          "answer": 3,
+          "why": "Cada terminal nueva necesita su source (en macOS, tools/macos_env.sh). Si una orden de ROS «no existe», casi siempre falta un source.",
+          "ref": "paso 0, 'Seis palabras que vas a leer' y 'Resumen'"
+        },
+        {
+          "q": "keyboard_drive y tu estrategia mueven el mismo coche sin conocerse. ¿Cómo es posible?",
+          "options": [
+            "Publican en el mismo tópico, /cmd_vel_raw",
+            "Las dos escriben órdenes en la carpeta install/",
+            "colcon las une en un solo programa",
+            "Las dos leen el cable USB del LiDAR"
+          ],
+          "answer": 0,
+          "why": "Los nodos se pasan mensajes por tópicos con nombre. Quien publica en /cmd_vel_raw pide velocidades al coche.",
+          "ref": "paso 0, 'Seis palabras que vas a leer' y 'Conduce con el teclado'"
+        },
+        {
+          "q": "Tu ronda puntúa casi 0 aunque el código esté bien. ¿Qué es lo más probable?",
+          "options": [
+            "El LiDAR del simulador está roto",
+            "Quedan procesos de una ronda anterior",
+            "Falta correr rosdep install antes de compilar",
+            "La cámara va a 6 fotogramas"
+          ],
+          "answer": 1,
+          "why": "Un gz sim o nodos de una ronda cortada se mezclan con la nueva. Ciérralos con clean_sim.sh antes de lanzar otra.",
+          "ref": "paso 0, 'Si algo falla'"
+        },
+        {
+          "q": "Compilaste con colcon build, sin --symlink-install. Editas drive.py y la ronda sigue igual que antes. ¿Por qué?",
+          "options": [
+            "Python sigue usando la versión vieja en caché",
+            "Falta hacer git commit de tus cambios",
+            "install/ es una copia: hay que recompilar",
+            "Gazebo carga el código solo al arrancar"
+          ],
+          "answer": 2,
+          "why": "Sin --symlink-install, install/ guarda una copia de tus archivos. Recompila con colcon build --packages-select my_open tras cada cambio.",
+          "ref": "paso 0, 'Ubuntu 24.04' y 'macOS (RoboStack)'"
+        },
+        {
+          "q": "¿Por qué git no ve tu carpeta src/my_open en la rama main?",
+          "options": [
+            "Porque ROS la borra al compilar",
+            "Porque solo existe en la rama solutions",
+            "Porque colcon la mueve a install/",
+            "Porque main la ignora: es tu código"
+          ],
+          "answer": 3,
+          "why": "Git ignora src/my_open en main porque es tu código. La referencia de cada paso está en la rama solutions, con etiquetas step-N.",
+          "ref": "paso 0, 'Tu código y la referencia'"
+        }
+      ]
+    },
+    {
+      "step": 1,
+      "title": "El coche",
+      "questions": [
+        {
+          "q": "Un coche gira con el volante fijo. Si duplica su velocidad, ¿qué pasa con el radio del círculo?",
+          "options": [
+            "Se hace el doble de grande y la curva se abre",
+            "Se reduce a la mitad porque va más rápido",
+            "Se queda igual; solo cambia lo que tarda",
+            "Se hace cuatro veces más pequeño al ir veloz"
+          ],
+          "answer": 2,
+          "why": "El radio solo depende del ángulo del volante. La velocidad solo cambia el tiempo que tarda la vuelta.",
+          "ref": "paso 1, 'La idea'"
+        },
+        {
+          "q": "En turn_radius cambias math.tan(steer) por steer. ¿Cuándo se nota el error?",
+          "options": [
+            "Sobre todo con el volante a tope: un 3 %",
+            "Siempre: el radio sale el doble de grande",
+            "Solo cuando el coche va muy rápido",
+            "Nunca: tan(δ) y δ son lo mismo"
+          ],
+          "answer": 0,
+          "why": "Con ángulos pequeños tan(δ) se parece a δ: a 0,1 rad casi no cambia. Con el volante a tope el radio mínimo pasa de 0,370 a 0,382 m.",
+          "ref": "paso 1, 'Rómpelo'"
+        },
+        {
+          "q": "L = 0,1174 m es la distancia entre ejes. Con tan(0,25) = 0,255, ¿qué radio de giro sale con el volante a 0,25 rad?",
+          "options": [
+            "0,03 m",
+            "2,17 m",
+            "4,6 m",
+            "0,46 m"
+          ],
+          "answer": 3,
+          "why": "Radio = L / tan(δ) = 0,1174 / 0,255 = 0,46 m. Es el círculo que usa la referencia.",
+          "ref": "paso 1, 'La idea' y 'Prueba esto' (paso 1)"
+        },
+        {
+          "q": "Pones el volante a 0,30 rad y el radio medido sale 0,43 m, no 0,38 m. ¿Qué pasa?",
+          "options": [
+            "La fórmula L / tan(δ) falla con ángulos pequeños",
+            "Cerca del tope, el simulador recorta el ángulo",
+            "El coche va demasiado lento para girar con precisión",
+            "El giroscopio acumula un sesgo muy grande en la curva"
+          ],
+          "answer": 1,
+          "why": "El servo llega a 0,307 rad y desde unos 0,278 rad el simulador recorta el ángulo. El radio sale un 13 % mayor.",
+          "ref": "paso 1, 'Pruébalo en el simulador' (tabla)"
+        },
+        {
+          "q": "angular.z es la velocidad de giro que recibe el coche. ¿Qué hace cmd.angular.z = speed * math.tan(steer) / WHEELBASE?",
+          "options": [
+            "Pasa la velocidad de giro a ángulo de volante",
+            "Calcula el radio del círculo que dibuja el coche",
+            "Pasa el ángulo del volante a velocidad de giro",
+            "Suma lo que ha girado el coche hasta ahora"
+          ],
+          "answer": 2,
+          "why": "El coche recibe una velocidad de giro, no un ángulo. Esa línea pasa de uno a otro con la primera fórmula.",
+          "ref": "paso 1, 'Por qué la estrategia lo necesita'"
+        }
+      ]
+    },
+    {
+      "step": 2,
+      "title": "El rumbo",
+      "questions": [
+        {
+          "q": "El giroscopio dice a qué velocidad gira el coche (rad/s). ¿Cómo se obtiene el rumbo con esas lecturas?",
+          "options": [
+            "Leyendo directamente el último valor del giroscopio",
+            "Restando cada lectura a la anterior",
+            "Promediando las últimas 30 lecturas",
+            "Sumando cada lectura multiplicada por el tiempo dt"
+          ],
+          "answer": 3,
+          "why": "El rumbo es una suma: yaw = yaw + gyro * dt. Es como el cuentakilómetros, que suma velocidad por tiempo.",
+          "ref": "paso 2, 'El rumbo es una suma'"
+        },
+        {
+          "q": "Para medir el sesgo se promedian unas 30 lecturas con el coche quieto. ¿Por qué no basta una sola?",
+          "options": [
+            "El sesgo cambia mucho de una lectura a la otra",
+            "Una lectura trae ruido; el promedio, menos",
+            "La primera lectura siempre vale cero",
+            "Hacen falta 30 para sumar el giro total"
+          ],
+          "answer": 1,
+          "why": "El sesgo es constante, pero cada lectura trae ruido. Con N lecturas el ruido del promedio baja unas √N veces: con 30, más de cinco veces.",
+          "ref": "paso 2, 'El sesgo del giroscopio'"
+        },
+        {
+          "q": "Sin calibrar, el coche acaba torcido 3,4° tras 10 s, pero su rumbo estimado marca 0. ¿Por qué no lo corrige?",
+          "options": [
+            "Corrige el rumbo estimado, que no ve el error",
+            "El volante no tiene recorrido para corregir 3,4°",
+            "El LiDAR le confirma que va recto por el pasillo",
+            "El giroscopio se pone a cero cada 10 segundos"
+          ],
+          "answer": 0,
+          "why": "La ley mantiene el rumbo estimado en 0 y deja crecer el real. Nada dentro del coche avisa: por eso hay que calibrar.",
+          "ref": "paso 2, 'Por qué el coche no se da cuenta'"
+        },
+        {
+          "q": "Meta 3 rad y coche en -3 rad. wrap lleva el error a un valor entre -π y π. ¿Qué hace el volante sin wrap?",
+          "options": [
+            "Gira un poco a la derecha, por el camino más corto",
+            "Se queda recto, porque el error es cero",
+            "Gira al tope a la izquierda, por el camino largo",
+            "Gira al tope a la derecha, por el camino largo"
+          ],
+          "answer": 2,
+          "why": "Sin wrap el error es 3 - (-3) = 6 rad y el volante va al tope. Con wrap el error es 0,28 rad y gira poco.",
+          "ref": "paso 2, 'Rómpelo' y 'Volver al rumbo'"
+        },
+        {
+          "q": "En heading_steer, el volante es KP * (goal - yaw) con KP = 0,8. ¿Qué significa KP?",
+          "options": [
+            "El rumbo máximo que puede tener el coche, en radianes",
+            "Los metros que avanza el coche en cada instante",
+            "Radianes de volante por cada radián de error",
+            "La velocidad de giro del giroscopio en rad/s"
+          ],
+          "answer": 2,
+          "why": "KP dice cuánto volante das por cada radián de error. Con 0,1 rad de error, el volante gira 0,08 rad.",
+          "ref": "paso 2, 'Volver al rumbo: una ley proporcional'"
+        }
+      ]
+    },
+    {
+      "step": 3,
+      "title": "Ver el campo",
+      "questions": [
+        {
+          "q": "El LiDAR pierde un tramo de rayos seguidos sobre la pared de la isla. ¿Qué hace island_wall con ellos?",
+          "options": [
+            "Termina la pared en el primer rayo perdido",
+            "No los cuenta: un rayo perdido no vio nada",
+            "Los cambia por la mediana de sus rayos vecinos",
+            "Devuelve inf en los dos números de la pared"
+          ],
+          "answer": 1,
+          "why": "Solo acaban la pared más de 2 rayos seguidos con retorno que ven más allá. Con 15 % de rayos perdidos, 0 de 500 escaneos fallan.",
+          "ref": "paso 3, 'El final de la isla y el rumbo respecto a su pared' y 'Explora el escaneo'"
+        },
+        {
+          "q": "En un escaneo, algunos rayos llegan como inf. ¿Qué significa inf?",
+          "options": [
+            "La pared está pegada al coche, a distancia cero",
+            "El rayo midió justo 12 m, el máximo del LiDAR",
+            "El LiDAR falló y el coche debe parar ya",
+            "Ese rayo no volvió: no vio ninguna pared"
+          ],
+          "answer": 3,
+          "why": "inf es infinito: no volvió nada. Cerca del 4,3 % de los rayos se pierde al azar, y el código debe tolerarlo.",
+          "ref": "paso 3, 'Qué entrega el LiDAR'"
+        },
+        {
+          "q": "La pared de enfrente está a 1,5 m del centro del coche. El LiDAR va 0,128 m delante del centro. Coche recto: ¿qué mide?",
+          "options": [
+            "1,628 m",
+            "1,5 m",
+            "1,372 m",
+            "0,128 m"
+          ],
+          "answer": 2,
+          "why": "El LiDAR ya está 0,128 m más cerca de la pared: 1,5 - 0,128 = 1,372 m. Las distancias se miden desde el LiDAR.",
+          "ref": "paso 3, 'Qué entrega el LiDAR' y 'A lo largo de la pista'"
+        },
+        {
+          "q": "De 63 rayos a la izquierda, uno se cuela por un hueco y mide 9 m. La pared está a 0,25 m. ¿Qué da el promedio?",
+          "options": [
+            "Unos 0,40 m: se arrastra hacia el rayo",
+            "0,25 m: ignora al rayo, igual que la mediana",
+            "9 m: se queda con el valor del rayo salvaje",
+            "Unos 0,14 m: se queda más cerca que la pared"
+          ],
+          "answer": 0,
+          "why": "El promedio se arrastra hacia el rayo salvaje y da 0,396 m. La mediana ni lo nota y da 0,255 m.",
+          "ref": "paso 3, 'Mediana, no promedio'"
+        },
+        {
+          "q": "front_axis multiplica cada distancia por un coseno. ¿Para qué?",
+          "options": [
+            "Para ignorar los rayos perdidos, los que llegan como inf",
+            "Para pasar las distancias de metros a centímetros",
+            "Para quitar el ruido de 8 mm que tiene cada rayo",
+            "Para medir a lo largo de la pista, aunque vaya torcido"
+          ],
+          "answer": 3,
+          "why": "Si el coche va torcido, una pared en diagonal parece más lejos. Con el coseno, front_axis mide a lo largo de la pista.",
+          "ref": "paso 3, 'A lo largo de la pista'"
+        }
+      ]
+    },
+    {
+      "step": 4,
+      "title": "Seguir la isla",
+      "questions": [
+        {
+          "q": "¿Por qué la ley de carril desplaza la meta del rumbo en vez de mover el volante según el hueco?",
+          "options": [
+            "Así hay una sola suma y el coche no zigzaguea",
+            "Porque el volante no puede girar más de 17,6°",
+            "Porque el LiDAR no mide bien el hueco",
+            "Así el coche va más rápido en las rectas"
+          ],
+          "answer": 0,
+          "why": "El volante cambia el rumbo y el rumbo la posición: dos sumas seguidas zigzaguean fácil. Con la meta queda una y el hueco baja sin pasarse.",
+          "ref": "paso 4, 'Corregir el rumbo, no el hueco'"
+        },
+        {
+          "q": "Una lectura mala dice que la isla está muy lejos. ¿Para qué sirve LIMIT?",
+          "options": [
+            "Para que el coche no se acerque a menos de 0,25 m",
+            "Para que el coche no pase de 0,6 m/s en las rectas",
+            "Para que el desvío del rumbo no pase de un tope",
+            "Para que el LiDAR no pierda rayos al azar en el escaneo"
+          ],
+          "answer": 2,
+          "why": "LIMIT corta el desvío a 0,4 rad. Sin él, una lectura de 5 m pediría 1,4 rad (82°) de golpe.",
+          "ref": "paso 4, 'Corregir el rumbo, no el hueco' y 'Rómpelo'"
+        },
+        {
+          "q": "GAP es 0,25 m y GAIN 0,3 rad por metro. El coche está a 0,55 m de la isla. ¿Qué desvío pide la ley?",
+          "options": [
+            "0,165 rad hacia la isla",
+            "0,09 rad hacia la isla",
+            "0,09 rad alejándose de la isla",
+            "0,30 rad hacia la isla"
+          ],
+          "answer": 1,
+          "why": "Error = 0,55 - 0,25 = 0,30 m. Desvío = 0,3 * 0,30 = 0,09 rad, hacia la isla porque está más lejos de lo debido.",
+          "ref": "paso 4, 'Corregir el rumbo, no el hueco' (ejemplo 0,45 m)"
+        },
+        {
+          "q": "Pones GAIN = 0 y el coche sale a 0,45 m de la isla. ¿Qué hueco tiene a los 14 s?",
+          "options": [
+            "Unos 0,287 m, la bajada lenta del GAIN de 0,3",
+            "Unos 0,25 m: llega justo al hueco buscado",
+            "Unos 0,00 m: choca con la isla poco a poco",
+            "Sigue en unos 0,456 m: nunca corrige"
+          ],
+          "answer": 3,
+          "why": "Con GAIN = 0 el desvío es siempre 0 y el coche sigue como salió. Con GAIN 0,3 serían 0,287 m.",
+          "ref": "paso 4, 'Cambia GAIN y mide' y 'Rómpelo'"
+        },
+        {
+          "q": "En el mini, GAIN = 3,0 llega al hueco casi al instante. ¿Por qué la referencia usa 0,3?",
+          "options": [
+            "Con 3,0 el coche oscila y nunca llega",
+            "Lenta pero segura: con 3,0 rozó la isla",
+            "Con 3,0 el volante pasa del límite de 25°",
+            "Gazebo demostró que 0,3 es la mejor"
+          ],
+          "answer": 1,
+          "why": "En el Open lab, GAIN 3,0 dio 5 de 6 rondas válidas: una rozó la isla. 0,3 es un valor probado y seguro, no el mejor medido.",
+          "ref": "paso 4, 'Cambia GAIN y mide'"
+        }
+      ]
+    },
+    {
+      "step": 5,
+      "title": "La esquina",
+      "questions": [
+        {
+          "q": "En la ley de rumbo, ¿cómo se pide una esquina de 90° a la izquierda?",
+          "options": [
+            "Restando π/2 (90°) a goal, la meta del rumbo",
+            "Sumando π/2 (90°) a yaw, el rumbo que mide el giroscopio",
+            "Sumando π/2 (90°) a goal, la meta del rumbo",
+            "Cambiando el hueco GAP de 0,25 m a 0,50 m"
+          ],
+          "answer": 2,
+          "why": "Girar a la izquierda 90 grados es sumar π/2 a goal. yaw se mide con el giroscopio y no se toca.",
+          "ref": "paso 5, 'Girar es mover la meta'"
+        },
+        {
+          "q": "TURN_TOLERANCE = 0,3 rad. Al coche le faltan 0,5 rad para la meta de la esquina. ¿Qué volante pide arc_steer?",
+          "options": [
+            "El tope, hacia el lado de la meta",
+            "0,40 rad: KP por el error, sin recortar",
+            "Cero: la esquina ya terminó y va recto",
+            "El tope, hacia el lado contrario a la meta"
+          ],
+          "answer": 0,
+          "why": "Lejos de la meta el volante va a tope hacia ella. El tope se suelta cuando faltan 0,3 rad (17°) o menos.",
+          "ref": "paso 5, 'Girar es mover la meta' y 'Lo difícil es soltar a tiempo'"
+        },
+        {
+          "q": "KP = 0,8 y DAMPING = 0,1. Faltan 0,2 rad para la meta y el coche gira hacia ella a 1,0 rad/s. ¿Qué volante pide damped_steer?",
+          "options": [
+            "0,16 rad",
+            "0,26 rad",
+            "0,307 rad",
+            "0,06 rad"
+          ],
+          "answer": 3,
+          "why": "Volante = KP * error - DAMPING * gyro = 0,8 * 0,2 - 0,1 * 1,0 = 0,06 rad. Cuanto más rápido gira el coche, menos volante pide.",
+          "ref": "paso 5, 'Un freno para terminar: el amortiguamiento' y paso 5.1"
+        },
+        {
+          "q": "Con un servo lento, soltar el tope a 17° de la meta se pasa 6,0° aun con amortiguamiento. ¿Qué lo deja en 0°?",
+          "options": [
+            "Soltar más tarde, a 7° de la meta",
+            "Soltar antes, a 29° de la meta",
+            "Quitar el amortiguamiento de la ley",
+            "Subir la velocidad de esquina a 1,28 m/s"
+          ],
+          "answer": 1,
+          "why": "Un servo lento tarda más en enderezar las ruedas. Soltando a 29° (0,50 rad) con amortiguamiento el sobrepaso es 0,0°.",
+          "ref": "paso 5, 'Cuándo soltar (medido en el laboratorio de Python)'"
+        },
+        {
+          "q": "Con el servo real sueltas el tope a 3° de la meta en vez de a 17°. ¿Qué pasa en la esquina de 90°?",
+          "options": [
+            "Se pasa 12°: el servo tarda en enderezar",
+            "Llega justo: el tope lleva hasta la meta",
+            "Se queda corto y nunca llega a los 90°",
+            "Gira hacia el lado contrario de la esquina"
+          ],
+          "answer": 0,
+          "why": "El servo tarda unas tres décimas en enderezar y el coche sigue girando. Soltando a 3° llega a 102°; a 17° no se pasa.",
+          "ref": "paso 5, 'Lo difícil es soltar a tiempo' y 'Cuándo soltar'"
+        }
+      ]
+    },
+    {
+      "step": 6,
+      "title": "Cuándo girar",
+      "questions": [
+        {
+          "q": "¿Por qué el coche gira solo cuando se cumplen varias condiciones a la vez y no con una sola medida?",
+          "options": [
+            "Para que el coche gire más rápido en cada esquina",
+            "Una sola medida puede engañar, como un rayo suelto",
+            "Porque el LiDAR solo entrega un número por cada escaneo",
+            "Porque el giroscopio no mide la pared de enfrente"
+          ],
+          "answer": 1,
+          "why": "Girar a destiempo es el error más caro: pronto se come la isla, tarde choca. Un rayo suelto o la pared cerca no bastan.",
+          "ref": "paso 6, 'Girar a destiempo es el error más caro'"
+        },
+        {
+          "q": "Al acabar la isla, left salta a unos 2,5 m. ¿Por qué el nodo usa entonces GAP como distancia a la isla?",
+          "options": [
+            "Para poder girar otra vez al instante",
+            "Para frenar antes de entrar en la esquina",
+            "Para que el LiDAR no cuente rayos perdidos",
+            "Para no girar hacia donde ya no hay isla"
+          ],
+          "answer": 3,
+          "why": "Con la isla terminada, la ley de carril pediría acercarse a una pared que no existe. Con GAP el error es cero y no hay desvío.",
+          "ref": "paso 6, 'Sin offset en la esquina'"
+        },
+        {
+          "q": "LOOKAHEAD es 0,35 m y END_CLEARANCE 0,08 m. La isla está a 0,40 m del coche. ¿Hasta qué distancia cuenta el final de la isla?",
+          "options": [
+            "0,32 m",
+            "0,35 m",
+            "0,27 m",
+            "0,48 m"
+          ],
+          "answer": 0,
+          "why": "El límite es min(0,35; 0,40 - 0,08) = min(0,35; 0,32) = 0,32 m. Con la isla a 0,30 m bajaría a 0,22 m.",
+          "ref": "paso 6, 'Dos detalles de la condición 3' y paso 6.5"
+        },
+        {
+          "q": "Cuentas el final de la isla en cada tick (50 por segundo) y no por escaneo (10 por segundo). ¿Qué pasa?",
+          "options": [
+            "La puerta nunca confirma el final y no gira",
+            "El coche gira a la derecha en vez de a la izquierda",
+            "Un solo escaneo basta para confirmar y gira antes",
+            "Nada cambia: el resultado es el mismo"
+          ],
+          "answer": 2,
+          "why": "El mismo escaneo llega 5 ticks seguidos. Contado cada vez, 'dos escaneos seguidos' se cumple con uno solo.",
+          "ref": "paso 6, 'Un escaneo cuenta una vez' y 'Rómpelo'"
+        },
+        {
+          "q": "Al empezar la recta la pared de enfrente está a 2,40 m. Luego mide 2,10 m y después, con ruido, 2,13 m. ¿Qué guarda StraightDistance?",
+          "options": [
+            "0,27 m",
+            "0,30 m",
+            "2,13 m",
+            "0,03 m"
+          ],
+          "answer": 1,
+          "why": "La distancia recorrida es lo que se acercó la pared: 2,40 - 2,10 = 0,30 m. Nunca baja: el coche no fue marcha atrás.",
+          "ref": "paso 6, 'La distancia recorrida: la pared de enfrente, no un encoder' y paso 6.6"
+        }
+      ]
+    },
+    {
+      "step": 7,
+      "title": "La misión",
+      "questions": [
+        {
+          "q": "Dentro de RUN no hay más estados. ¿Cómo sabe la misión si sigue la pared, gira o termina?",
+          "options": [
+            "Con estados FOLLOW, TURN y FINISH",
+            "Con la pose real que guarda el árbitro",
+            "Con los segundos pasados desde Start",
+            "Con dos datos: completed y arc"
+          ],
+          "answer": 3,
+          "why": "completed cuenta las esquinas hechas y arc dice si hay una en curso. FOLLOW, TURN y FINISH son solo nombres calculados con esos dos datos.",
+          "ref": "paso 7, 'Tres estados y dos datos'"
+        },
+        {
+          "q": "TURN_FRONT = 1,19 m, BRAKE_MARGIN = 0,15 m y BRAKE_GAIN = 2,0. La pared de enfrente está a 1,44 m. ¿Qué velocidad pide la recta?",
+          "options": [
+            "1,20 m/s",
+            "1,28 m/s",
+            "1,00 m/s",
+            "0,20 m/s"
+          ],
+          "answer": 0,
+          "why": "gap = 1,44 - 1,19 - 0,15 = 0,10 m. Velocidad = min(1,28; 1,0 + 2,0 * 0,10) = 1,20 m/s. Así frena antes de cada esquina.",
+          "ref": "paso 7, 'Frenar antes de cada esquina' y paso 7.5"
+        },
+        {
+          "q": "¿Por qué toda la lógica de la misión está en mission.py, sin ROS, y drive.py solo reenvía?",
+          "options": [
+            "Los nodos de ROS no pueden guardar variables",
+            "Así el código va más rápido en el coche",
+            "Así corre en pytest, en el lab y en Gazebo",
+            "Gazebo no acepta lógica escrita en Python"
+          ],
+          "answer": 2,
+          "why": "La misma misión corre en el nodo, en el Open lab y en las pruebas. Si algo falla en Gazebo, casi siempre lo reproduces con escenas a mano.",
+          "ref": "paso 7, 'La lógica es Python puro; el nodo es una envoltura'"
+        },
+        {
+          "q": "Pones WALL_HEADING_GAIN = 0 y el giroscopio lee un 6 % de menos. ¿Qué ves en el laboratorio (36 rondas)?",
+          "options": [
+            "Las 36 rondas siguen válidas con 30 puntos",
+            "0 de 36 válidas: 33 chocan en una recta",
+            "34 válidas; las otras dos paran fuera de la salida",
+            "18 válidas; las otras 18 sacan 27 puntos"
+          ],
+          "answer": 1,
+          "why": "Con cada escaneo la pared de la isla corrige 0,3 de la diferencia con el giroscopio. Sin eso, los 5° por esquina se acumulan.",
+          "ref": "paso 7, 'El giroscopio se queda corto: la pared de la isla lo corrige' y 'Rómpelo'"
+        },
+        {
+          "q": "¿Por qué _braking se queda en True para siempre una vez que empieza a frenar?",
+          "options": [
+            "Para que un rayo con ruido no reinicie el motor",
+            "Para que el coche no vuelva a calibrar el giroscopio",
+            "Para guardar la distancia de la vuelta 3",
+            "Para que la cámara no cambie el sentido"
+          ],
+          "answer": 0,
+          "why": "Si un rayo con ruido hace que la pared parezca más lejos, sin el enclavamiento el motor arrancaría otra vez.",
+          "ref": "paso 7, 'El final de la vuelta' y paso 7.7"
+        }
+      ]
+    },
+    {
+      "step": 8,
+      "title": "La dirección",
+      "questions": [
+        {
+          "q": "Lanzas la ronda con direction:=cw. ¿Cómo sabe tu nodo hacia dónde dar las vueltas?",
+          "options": [
+            "Lee el argumento direction del lanzador",
+            "Prueba un sentido y cambia si choca",
+            "Lo decide la cámara con las dos líneas",
+            "Siempre va en sentido antihorario"
+          ],
+          "answer": 2,
+          "why": "direction solo cambia hacia dónde aparece mirando el coche. El nodo no lo recibe: azul más larga vota +1 (ccw) y naranja más larga -1 (cw).",
+          "ref": "paso 8, 'Dos líneas de colores' y 'Pruébalo en el simulador'"
+        },
+        {
+          "q": "Si la misión no recibe ningún sentido de la cámara en 15 s, ¿qué hace?",
+          "options": [
+            "Se detiene (DIRECTION_FAULT) en vez de apostar",
+            "Elige antihorario por defecto y arranca la ronda",
+            "Elige un sentido al azar y arranca la ronda",
+            "Sigue esperando sin límite de tiempo hasta que vote"
+          ],
+          "answer": 0,
+          "why": "Parar es mejor que adivinar. Sin voto en 15 s, la misión se detiene con DIRECTION_FAULT.",
+          "ref": "paso 8, 'Cómo usa la misión el sentido'"
+        },
+        {
+          "q": "Una imagen mide azul 80 px y naranja 200 px. La confianza es |azul - naranja| / la línea más larga. ¿Cuánto vale?",
+          "options": [
+            "0,40",
+            "1,50",
+            "0,28",
+            "0,60"
+          ],
+          "answer": 3,
+          "why": "|80 - 200| / 200 = 0,60. Pasa el mínimo de 0,25 y la naranja es más larga, así que vota -1.",
+          "ref": "paso 8, 'Una imagen puede mentir'"
+        },
+        {
+          "q": "Con CONFIRMATIONS = 1, un solo cuadro con la naranja más larga aparece entre cuadros con la azul más larga. ¿Qué pasa?",
+          "options": [
+            "La decisión sigue en +1: un cuadro no cambia nada",
+            "La decisión salta a -1 en ese cuadro",
+            "La decisión se queda en 0 y nunca llega a decidir",
+            "La misión se detiene con DIRECTION_FAULT"
+          ],
+          "answer": 1,
+          "why": "Con 1, un cuadro basta para decidir y un reflejo puede empezar la ronda al revés. Con 5, un cuadro malo reinicia la cuenta.",
+          "ref": "paso 8, 'Rómpelo'"
+        },
+        {
+          "q": "Para decidir hacen falta 5 votos seguidos iguales. Llegan 3 votos +1, una imagen sin voto y luego más +1. ¿Cuántos +1 hacen falta?",
+          "options": [
+            "2",
+            "3",
+            "5",
+            "8"
+          ],
+          "answer": 2,
+          "why": "La imagen sin voto reinicia la cuenta a 0. Hacen falta 5 votos seguidos otra vez (en la tabla decide en la imagen 9).",
+          "ref": "paso 8, 'Una imagen puede mentir' (tabla de ejemplo)"
+        }
+      ]
+    },
+    {
+      "step": 9,
+      "title": "Puntuar y medir",
+      "questions": [
+        {
+          "q": "La estrategia termina y marca DONE. ¿Cuándo cuentan los 3 puntos de la parada para el juez?",
+          "options": [
+            "Siempre que la estrategia diga DONE, sin comprobar nada",
+            "Si todo el coche para dentro de la sección de salida",
+            "Si el coche para en cualquier sección del tapete",
+            "Si el coche para antes de que acabe la vuelta 3"
+          ],
+          "answer": 1,
+          "why": "El DONE de la estrategia no da puntos. El juez mira la pose real: todo el coche en la sección de salida y quieto 15 s.",
+          "ref": "paso 9, 'Qué puntúa el juez'"
+        },
+        {
+          "q": "En square100 ccw, el Open lab da 33,78 s y Gazebo 35,56 s. ¿Qué conclusión es correcta?",
+          "options": [
+            "Tu estrategia es 1,78 s más lenta en Gazebo que en el lab",
+            "El lab es más fiable porque corre mucho más rápido",
+            "Gazebo mide mal, así que hay que fiarse del lab",
+            "No se comparan: son dos modelos distintos"
+          ],
+          "answer": 3,
+          "why": "El lab no modela el deslizamiento de las ruedas ni parte de la dinámica de Gazebo. Filtra ideas; Gazebo decide.",
+          "ref": "paso 9, 'El Open lab: filtro rápido, no autoridad'"
+        },
+        {
+          "q": "Intento A: 27 puntos en 30 s. Intento B: 30 puntos en 40 s. ¿Cuál es mejor según la guía?",
+          "options": [
+            "A: es 10 s más rápido y eso decide",
+            "Empatan: puntos y tiempo pesan igual",
+            "B: más puntos, aunque tarde más",
+            "A: 27 puntos bastan si va más rápido"
+          ],
+          "answer": 2,
+          "why": "Primero los puntos, después el tiempo. Un intento de 27 puntos en 30 s pierde contra uno de 30 puntos en 40 s.",
+          "ref": "paso 9, 'Rondas, tiempo y orden'"
+        },
+        {
+          "q": "Una ronda saca 30 puntos pero el sensor de contacto detecta que el coche tocó un muro. ¿Qué resumen sale?",
+          "options": [
+            "30 de 30, pero Válida: no (no_contacts)",
+            "27 de 30, porque el golpe resta 3 puntos",
+            "30 de 30 y Válida: sí, el contacto no cuenta",
+            "La ronda se borra y no imprime nada"
+          ],
+          "answer": 0,
+          "why": "Los puntos son la regla. 'Válida' pide además cero contactos, 1 cm de margen, volante hasta 25° y parada observada 30 s.",
+          "ref": "paso 9, 'Qué es una ronda válida' y 'Cómo leer lo que imprime score'"
+        },
+        {
+          "q": "Cambias TURN_FRONT y CRUISE_SPEED a la vez y la ronda tarda más. ¿Qué falla en tu método?",
+          "options": [
+            "Faltó correr la ronda solo en el lab",
+            "Faltó comparar el tiempo de pared",
+            "Nada: dos cambios ahorran rondas",
+            "No sabes cuál de los dos lo empeoró"
+          ],
+          "answer": 3,
+          "why": "Un cambio por fila, con valor anterior y nuevo, y tres rondas antes de concluir. Si baja puntos o validez, se descarta.",
+          "ref": "paso 9, 'Paso 9.3: anotar'"
+        }
+      ]
+    }
+  ]
+}

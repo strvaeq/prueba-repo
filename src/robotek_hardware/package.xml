@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>robotek_hardware</name>
+  <version>0.1.0</version>
+  <description>Real-car only: adapters between your strategy (/cmd_vel_raw, /scan, /imu, /start) and the HiWonder RRC Lite (servo, IMU, button, RGBs), the TB6612 motor and the LD19 lidar.</description>
+  <maintainer email="renzo.damian.go@gmail.com">Renzo Damian</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <!-- The board driver (src/rrc_lite_msgs). If it is not in the workspace the nodes start and log an error. -->
+  <exec_depend>rrc_lite_msgs</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

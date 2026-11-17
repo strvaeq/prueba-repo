@@ -1,0 +1,159 @@
+"""Lot exit (start_lot): the direction from the LiDAR's sides and the coach's pulse sequence."""
+import math
+import types
+
+import numpy as np
+
+from robotek_obstacle_v3 import lot_exit, park_fixed
+from robotek_obstacle_v3.settings import make
+
+
+def scan_with_sides(left, right):
+    angles = np.linspace(-math.pi, math.pi, 720, endpoint=False)
+    ranges = np.full(angles.size, 2.0)
+    ranges[np.abs(angles - math.pi / 2) < 0.3] = left
+    ranges[np.abs(angles + math.pi / 2) < 0.3] = right
+    return types.SimpleNamespace(ranges=ranges.tolist(), angle_min=-math.pi, angle_increment=angles[1] - angles[0],
+                                 range_min=0.02)
+
+
+def test_direction_from_the_near_side():
+    sign, wall = lot_exit.direction_in_lot(scan_with_sides(1.1, 0.5))
+    assert sign == 1 and abs(wall - 0.5) < 0.01                                  # wall on the right: CCW
+    assert lot_exit.direction_in_lot(scan_with_sides(0.5, 1.1))[0] == -1          # wall on the left: CW
+    sign, wall = lot_exit.direction_in_lot(scan_with_sides(1.1, math.inf))        # too near to be seen
+    assert sign == 1 and abs(wall - (lot_exit.WALL_GAP + lot_exit.OUTLINE_HALF_WIDTH)) < 1e-9
+    assert lot_exit.direction_in_lot(scan_with_sides(0.5, 0.45))[0] == 0          # unsure
+
+
+def run(ex, rear):
+    now, heading, seen = 0.0, 0.0, []
+    while not ex.done and now < 20:
+        speed, steer = ex.step(now, heading, rear(ex))
+        if abs(speed) > 0.01:
+            seen.append((ex.name, speed > 0, steer > 0))
+            heading += speed * 0.02 * math.tan(steer) / 0.11883
+        if ex.brake:
+            seen.append(('BRAKE', ex.name))
+        now += 0.02
+    return seen
+
+
+def test_default_steps_in_order_with_their_lengths():
+    p = make({'start_lot': 1.0})
+    ex = lot_exit.LotExit(park_fixed.make_lot(1, p), 0.084, 10, 0.06, 0.3054)
+    now, starts, last = 0.0, [], None
+    while not ex.done and now < 30:
+        speed, steer = ex.step(now, 0.0, 100)
+        moving = (ex.name, speed > 0, steer > 0) if abs(speed) > 0.01 else None
+        if moving and moving != last:
+            starts.append([*moving, now])
+        if moving and starts:
+            starts[-1].append(now)
+        last = moving
+        now += 0.01
+    assert ex.done
+    assert [tuple(s[:3]) for s in starts] == [('1_LFWD', True, True), ('2_RBACK', False, False), ('3_LFWD', True, True),
+                                              ('4_RBACK', False, False), ('5_LFWD', True, True), ('6_RBACK', False, False),
+                                              ('7_LFWD', True, True), ('8_CBACK', False, False)]
+    lengths = [s[-1] - s[3] + 0.01 for s in starts]
+    assert all(abs(a - b) < 0.015 for a, b in zip(lengths, [0.45, 0.55, 0.45, 0.55, 0.45, 0.55, 0.78, 0.4]))
+
+
+def test_bad_steps_are_refused():
+    assert [st[1:] for st in lot_exit.parse_steps('C+0.3 c-1')] == [(1.0, 0.0, 0.3), (-1.0, 0.0, 1.0)]
+    for bad in ('', 'X+1', 'L*1', 'L+0', 'L+abc'):
+        try:
+            lot_exit.parse_steps(bad)
+        except ValueError:
+            continue
+        raise AssertionError(bad)
+
+
+def test_reverse_brakes_on_the_rear_sensor():
+    p = make({'start_lot': 1.0})
+    ex = lot_exit.LotExit(park_fixed.make_lot(1, p), 0.084, 10, 0.06, 0.3054, 'L+0.5 R-0.5 L+0.5')
+    seen = run(ex, lambda e: 15 if e.name == '2_RBACK' else 100)
+    assert ('BRAKE', '2_RBACK') in seen
+    assert [e['braked'] for e in ex.log if e['event'] == 'lot_exit_pulse'] == [False, True, False]
+
+
+def test_straight_steps_keep_the_wheels_centred_and_move_the_estimate():
+    p = make({'start_lot': 1.0})
+    ex = lot_exit.LotExit(park_fixed.make_lot(1, p), 0.084, 10, 0.2, 0.3054, 'C+0.5')
+    x0 = ex.pose[0]
+    now, steers = 0.0, set()
+    while not ex.done and now < 5:
+        speed, steer = ex.step(now, 0.0, 100)
+        if abs(speed) > 0.01:
+            steers.add(steer)
+        now += 0.01
+    assert steers == {0.0} and abs(ex.pose[0] - x0 - 0.1) < 0.01      # 0.5 s at 0.2 m/s
+
+
+def test_front_recover_reverses_right_in_ccw_left_in_cw():
+    from robotek_obstacle_v3.mission import Mission
+    for direction, side in (('ccw', -1.0), ('cw', 1.0)):
+        m = Mission({})
+        m.selected_direction, m.pose = direction, (0.3, -1.0, math.radians(30))
+        m._scan = scan_ahead(0.19, 0.0)
+        outs = []
+        for k in range(300):
+            out = m._front_recovery(k * 0.02, 0.19, 0.3, 0.0)
+            if out is None:
+                break
+            outs.append(out)
+            m._scan = scan_ahead(3.0, 0.0)
+        assert outs[0][0] == 0.003 and m.events[0]['event'] == 'front_recover'       # brake first
+        backing = [o for o in outs if o[0] < 0]
+        assert backing and all(o[1] * side > 0 for o in backing)                     # real steer: right in CCW
+        assert abs(len(backing) * 0.02 - m.p.recover_back) < 0.05
+
+
+def test_front_recover_repeats_back_further():
+    from robotek_obstacle_v3.mission import Mission, RECOVER_STRAIGHT
+    m = Mission({})
+    m.selected_direction, m.pose = 'ccw', (0.1, -1.0, 0.0)
+    lengths, now = [], 0.0
+    for _ in range(2):
+        m._scan = scan_ahead(0.19, 0.0)
+        n = 0
+        while True:
+            out = m._front_recovery(now, 0.19, 0.3, 0.0)
+            now += 0.02
+            if out is None:
+                break
+            m._scan = scan_ahead(3.0, 0.0)
+            n += out[0] < 0
+        lengths.append(n * 0.02)
+    assert abs(lengths[0] - m.p.recover_back) < 0.05 and abs(lengths[1] - m.p.recover_back - RECOVER_STRAIGHT) < 0.05
+
+
+def scan_ahead(r, bearing):
+    angles = np.linspace(-math.pi, math.pi, 720, endpoint=False)
+    ranges = np.full(angles.size, 3.0)
+    ranges[np.abs(angles - bearing) < 0.02] = r
+    return types.SimpleNamespace(ranges=ranges.tolist(), angle_min=-math.pi, angle_increment=angles[1] - angles[0],
+                                 range_min=0.02, range_max=12.0)
+
+
+def test_front_recover_follows_the_arc_being_driven():
+    from robotek_obstacle_v3.mission import Mission
+    m = Mission({})
+    m.selected_direction, m.pose = 'ccw', (0.3, -1.0, 0.0)
+    m._scan = scan_ahead(0.20, math.radians(15))       # a sign a little left, ~0.17 ahead of the nose
+    assert m._front_recovery(0.0, 0.2, 0.3, -0.3054) is None and not m.brake    # turning right, away: no
+    # Straight on it would hit, but full lock to the right still clears it: not yet (12 nov 2026: the lab's triggers were
+    # the outer wall beside a sign passed on the outer side, and the rounds ran out of time).
+    assert m._in_path(0.0) is not None
+    assert m._front_recovery(0.0, 0.2, 0.3, 0.0) is None and not m.brake
+    m._scan = scan_ahead(0.17, math.radians(15))       # 3 cm nearer: no steering clears it any more
+    assert m._front_recovery(0.0, 0.17, 0.3, 0.0) is not None and m.brake
+    m2 = Mission({})
+    m2.selected_direction, m2.pose = 'ccw', (0.3, -1.0, 0.0)
+    m2._scan = scan_ahead(0.15, math.radians(40))      # beside the nose, passing close
+    assert m2._front_recovery(0.0, 0.15, 0.3, 0.0) is None
+    m3 = Mission({})
+    m3.selected_direction, m3.pose = 'ccw', (0.3, -1.0, 0.0)
+    m3._scan = scan_ahead(0.30, 0.0)                   # 0.28 ahead of the nose, straight on: not yet
+    assert m3._front_recovery(0.0, 0.3, 0.3, 0.0) is None

@@ -1,0 +1,317 @@
+"""Unit conversions between the strategies' commands and the real car (no ROS).
+
+Strategies speak ROS conventions: /cmd_vel_raw Twist with linear.x in m/s and angular.z
+in rad/s for a bicycle model (wheelbase 0.1174 m), +steer = left; /scan with 0 rad
+straight ahead and angles growing counter-clockwise.
+
+The car: HiWonder RRC Lite servo commanded in
+microseconds (centre 1500 us, 550/29 us per degree on one side and 500/29 on the
+other, SERVO_SIGN -1, team convention +delta = right), TB6612 motor in percent, and
+an STL-19P lidar whose 0 deg points backwards (front 180, left 240, right 120 deg).
+"""
+from dataclasses import dataclass
+import math
+
+
+@dataclass
+class ServoCalibration:
+    center_us: float = 1500.
+    gain_pos_us_per_deg: float = 550./29.   # team SERVO_GAIN_POS
+    gain_neg_us_per_deg: float = 500./29.   # team SERVO_GAIN_NEG
+    sign: float = -1.                       # team SERVO_SIGN
+    min_us: float = 1000.
+    max_us: float = 2050.
+    limit_deg: float = 25.                  # rule-compliant limit used by the strategies
+
+
+@dataclass
+class MotorCalibration:
+    pct_per_mps: float = 40.    # TO MEASURE on the field: % of PWM per m/s
+    min_pct: float = 12.        # TO MEASURE: least % that moves the car (static friction)
+    max_pct: float = 100.
+    deadband_mps: float = .005  # |v| below this is a stop
+
+
+def steer_from_twist(linear, angular, wheelbase, previous):
+    """Steering angle (rad, +left) of a bicycle-model Twist; keeps the last one when stopped."""
+    if abs(linear) < 1e-3:
+        return previous
+    return math.atan(angular*wheelbase/linear)
+
+
+def servo_us(steer_rad, cal: ServoCalibration):
+    """Servo pulse for a steering angle (rad, +left), with the team's mapping."""
+    steer_deg = max(-cal.limit_deg, min(cal.limit_deg, math.degrees(steer_rad)))
+    delta = -steer_deg                 # team convention: +delta = right
+    d = delta*cal.sign
+    gain = cal.gain_pos_us_per_deg if d >= 0. else cal.gain_neg_us_per_deg
+    return max(cal.min_us, min(cal.max_us, cal.center_us+d*gain))
+
+
+def servo_for_wheel(wheel, servo_pts, left_pts, right_pts, wheel_limit=0.):
+    """Servo angle that gives a wheel angle (same unit, +left) on the real car.
+
+    servo_pts -> left_pts / right_pts is the measured wheel angle per side (from 0,
+    increasing); the inverse is interpolated piecewise and extrapolated with the last
+    slope. wheel is clamped to +-wheel_limit first (0 = no clamp). Without a table the
+    wheel angle is returned unchanged.
+    """
+    if wheel_limit > 0.:
+        wheel = max(-wheel_limit, min(wheel_limit, wheel))
+    if not servo_pts:
+        return wheel
+    side = left_pts if wheel >= 0. else right_pts
+    w, sign = abs(wheel), math.copysign(1., wheel)
+    points = [(0., 0.)]+list(zip(side, servo_pts))      # (wheel, servo)
+    for (w0, s0), (w1, s1) in zip(points, points[1:]):
+        if w <= w1:
+            return sign*(s0+(s1-s0)*(w-w0)/(w1-w0))
+    (w0, s0), (w1, s1) = points[-2], points[-1]
+    return sign*(s1+(s1-s0)*(w-w1)/(w1-w0))
+
+
+def rate_limit(current, target, accel, decel, dt):
+    """Next speed towards target: at most accel (m/s^2) when speeding up, decel when slowing
+    down or reversing (through 0 first). accel/decel <= 0 means no limit."""
+    if current*target < 0.:
+        target = 0.                      # change of direction: stop first
+    slowing = abs(target) < abs(current)
+    limit = decel if slowing else accel
+    if limit <= 0.:
+        return target
+    step = limit*dt
+    return current+max(-step, min(step, target-current))
+
+
+def motor_pct(speed_mps, cal: MotorCalibration):
+    """Signed motor command in % (negative = reverse)."""
+    if abs(speed_mps) < cal.deadband_mps:
+        return 0.
+    pct = cal.min_pct+cal.pct_per_mps*abs(speed_mps)
+    return math.copysign(min(cal.max_pct, pct), speed_mps)
+
+
+def wall_speed_factor(front_m, stop_m, slow_m):
+    """Share (0..1) of the forward speed allowed with the nearest obstacle ahead at front_m: 1 beyond slow_m,
+    0 at stop_m or nearer, linear in between. stop_m <= 0 disables it (always 1); unknown front (inf) is 1."""
+    if stop_m <= 0. or not math.isfinite(front_m):
+        return 1.
+    if front_m <= stop_m:
+        return 0.
+    if slow_m <= stop_m or front_m >= slow_m:
+        return 1.
+    return (front_m-stop_m)/(slow_m-stop_m)
+
+
+def front_distance(ranges, angle_min, increment, half_deg):
+    """Nearest valid range within +-half_deg of straight ahead (angle 0), inf if none."""
+    best = math.inf
+    for i, r in enumerate(ranges):
+        a = math.atan2(math.sin(angle_min+i*increment), math.cos(angle_min+i*increment))
+        if abs(math.degrees(a)) <= half_deg and math.isfinite(r) and r > 0.:
+            best = min(best, r)
+    return best
+
+
+def motor_rps(speed_mps, rps_per_mps, max_rps=0., sign=1., deadband_mps=.005, min_rps=0.):
+    """Signed motor speed in revolutions per second for the RRC Lite's closed-loop (encoder) motor ports.
+    rps_per_mps is measured on the car (motor rps per m/s of the car); max_rps <= 0 means no cap. min_rps > 0: any
+    speed outside the deadband gets at least that many rps (a motor that does not start lower down)."""
+    if abs(speed_mps) < deadband_mps:
+        return 0.
+    rps = speed_mps*rps_per_mps
+    if min_rps > 0. and abs(rps) < min_rps:
+        rps = math.copysign(min_rps, rps)
+    if max_rps > 0.:
+        rps = max(-max_rps, min(max_rps, rps))
+    return sign*rps
+
+
+def mask_scan(ranges, angle_min, increment, fov_deg=0., min_valid=0.):
+    """Ranges as inf outside +-fov_deg (0 = no limit) or closer than min_valid (0 = off)."""
+    out = []
+    for i, r in enumerate(ranges):
+        a = math.atan2(math.sin(angle_min+i*increment), math.cos(angle_min+i*increment))
+        if (fov_deg > 0. and abs(math.degrees(a)) > fov_deg) or (min_valid > 0. and r < min_valid):
+            out.append(math.inf)
+        else:
+            out.append(r)
+    return out
+
+
+def rotate_scan_angles(angle_min, angle_max, offset):
+    """Angles of a scan whose zero must be turned by offset (rad) to point forward."""
+    return angle_min+offset, angle_max+offset
+
+
+@dataclass
+class LowVoltage:
+    """True once `confirm` consecutive valid battery readings (V) are below min_v.
+
+    The board publishes the battery at ~1 Hz and single readings can be off (servo load, board
+    glitches), so a single low reading does not trip it. Readings below valid_v (a board glitch, 0 mV) are
+    ignored; a reading at or above min_v restarts the count. min_v <= 0 disables it."""
+    min_v: float = 6.8
+    confirm: int = 5
+    valid_v: float = 3.
+    count: int = 0
+
+    def update(self, volts):
+        if self.min_v <= 0. or volts < self.valid_v:
+            return self.count >= self.confirm > 0
+        self.count = self.count+1 if volts < self.min_v else 0
+        return self.count >= self.confirm
+
+
+# --- IMU axes -----------------------------------------------------------------------------------
+# The strategies read the gyro z as the yaw rate (+ = left) and expect the car frame: x forward,
+# y left, z up. The RRC Lite IMU turns with the board, so each car axis is named by the board axis
+# (and sign) that points the same way: forward_axis='+y' means "board +y points forward".
+
+def parse_axis(spec):
+    """'+y', '-x' or 'z' -> (index, sign)."""
+    text = str(spec).strip().lower()
+    sign = -1. if text.startswith('-') else 1.
+    name = text.lstrip('+-')
+    if name not in ('x', 'y', 'z'):
+        raise ValueError(f'axis must be x, y or z with an optional sign, got {spec!r}')
+    return 'xyz'.index(name), sign
+
+
+def axes_matrix(forward, left, up):
+    """Rows = car x (forward), y (left), z (up) as vectors in board axes. Must be right-handed."""
+    rows = []
+    for spec in (forward, left, up):
+        index, sign = parse_axis(spec)
+        row = [0., 0., 0.]
+        row[index] = sign
+        rows.append(row)
+    (a, b, c), (d, e, f), (g, h, i) = rows
+    det = a*(e*i - f*h) - b*(d*i - f*g) + c*(d*h - e*g)
+    if abs(det - 1.) > 1e-9:
+        raise ValueError(f'forward={forward} left={left} up={up} is not a right-handed frame '
+                         '(forward x left must be up); swap the sign of one axis')
+    return rows
+
+
+def remap_vector(vector, matrix):
+    """Board-frame vector -> car frame."""
+    return tuple(sum(m*v for m, v in zip(row, vector)) for row in matrix)
+
+
+def remap_covariance(covariance, matrix):
+    """Row-major 3x3 covariance in the board frame -> car frame (R C R^T)."""
+    c = [list(covariance[3*i:3*i + 3]) for i in range(3)]
+    rc = [[sum(matrix[i][k]*c[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+    return [sum(rc[i][k]*matrix[j][k] for k in range(3)) for i in range(3) for j in range(3)]
+
+
+def _snap(vector):
+    index = max(range(3), key=lambda k: abs(vector[k]))
+    norm = math.sqrt(sum(v*v for v in vector))
+    cosine = abs(vector[index])/norm if norm else 0.
+    return ('-' if vector[index] < 0 else '+') + 'xyz'[index], math.degrees(math.acos(min(1., cosine)))
+
+
+def estimate_axes(rest, push):
+    """Board axes of up/forward/left from the mean accelerometer at rest (reads +g upwards) and the
+    mean acceleration of a forward push (accelerometer readings, m/s^2, board frame).
+
+    Returns {'up', 'forward', 'left'} with the nearest board axis and 'error_deg' = how far each
+    measured direction is from that axis (large means the board is tilted or the push was not
+    straight)."""
+    rest = [float(v) for v in rest]
+    push = [float(v) for v in push]
+    up_norm = math.sqrt(sum(v*v for v in rest))
+    if up_norm < 1e-6:
+        raise ValueError('no gravity at rest')
+    up = [v/up_norm for v in rest]
+    along = sum(p*u for p, u in zip(push, up))
+    forward = [p - along*u for p, u in zip(push, up)]
+    if math.sqrt(sum(v*v for v in forward)) < 1e-6:
+        raise ValueError('the push has no horizontal component')
+    norm = math.sqrt(sum(v*v for v in forward))
+    forward = [v/norm for v in forward]
+    left = [up[1]*forward[2] - up[2]*forward[1], up[2]*forward[0] - up[0]*forward[2],
+            up[0]*forward[1] - up[1]*forward[0]]
+    result, errors = {}, {}
+    for name, vector in (('up', up), ('forward', forward), ('left', left)):
+        result[name], errors[name] = _snap(vector)
+    result['error_deg'] = {k: round(v, 1) for k, v in errors.items()}
+    return result
+
+
+class DitherBrake:
+    """Stop for an encoder motor whose board does not hold 0 (RRC Lite with the 310 motor, 4 nov 2026).
+
+    Sent 0, the board's speed loop let that motor run on, accelerate or roll back (any motor type, a single 0,
+    a ramp, a reverse pulse). What stopped it, 3 times out of 3 on the floor: right after the car was moving,
+    alternate +-amp_rps (reverse first) at hz for duration_s, then 0. The car stops ~12 cm after the order.
+    rps(now, requested) returns what to send instead of `requested`. amp_rps 0 disables it.
+    """
+
+    def __init__(self, amp_rps=0., hz=10., duration_s=1.5, min_rps=1.):
+        self.amp, self.hz, self.duration, self.min_rps = float(amp_rps), float(hz), float(duration_s), float(min_rps)
+        self.start = None             # time the brake began
+        self.direction = 0.           # sign of the last motion (rps)
+
+    @property
+    def enabled(self):
+        return self.amp > 0. and self.duration > 0. and self.hz > 0.
+
+    def braking(self, now):
+        return self.start is not None and now - self.start < self.duration
+
+    def rps(self, now, requested):
+        if not self.enabled:
+            return requested
+        if requested != 0.:
+            self.start = None
+            self.direction = math.copysign(1., requested) if abs(requested) >= self.min_rps else 0.
+            return requested
+        if self.start is None and self.direction != 0.:
+            self.start = now          # just told to stop after moving: brake
+        if self.braking(now):
+            half = int((now - self.start) * self.hz * 2.)
+            return -self.direction * self.amp * (1. if half % 2 == 0 else -1.)
+        self.start, self.direction = None, 0.
+        return 0.
+
+
+class LowSpeedDrive:
+    """Helps a motor with little torque at low speed (the 310 motor with the 54:30 gears, 8 nov 2026).
+
+    * Start kick: when the request goes from 0 to moving, the first kick_s seconds get at least kick_rps (same
+      direction), to break the static friction (wheels at full lock, standing start).
+    * Pulsing: a request below pulse_rps (but not 0) becomes pulse_rps for a share request/pulse_rps of every
+      pulse_period_s, and 0 the rest, so the mean speed is the one asked (the parking manoeuvres ask 0.06 m/s).
+    kick_rps 0 and pulse_rps 0 turn each off (then rps passes unchanged)."""
+
+    def __init__(self, kick_rps=0., kick_s=.2, pulse_rps=0., pulse_period_s=.5, kick_after_s=.5):
+        self.kick_rps, self.kick_s = float(kick_rps), float(kick_s)
+        self.pulse_rps, self.period = float(pulse_rps), float(pulse_period_s)
+        self.kick_after = float(kick_after_s)
+        self.moving_since = None
+        self.kick_until = -math.inf
+        self.stopped_since = -math.inf      # stopped since the start: the first move kicks
+
+    def rps(self, now, requested):
+        if requested == 0.:
+            if self.moving_since is not None:
+                self.stopped_since = now
+            self.moving_since = None
+            return 0.
+        if self.moving_since is None:
+            self.moving_since = now
+            # Kick only after a real stop (kick_after_s): the strategy's short sensor pauses (~0.05 s of 0) kicked the
+            # car again and again and, with full lock, spun it on the spot (8 nov 2026).
+            if now - self.stopped_since >= self.kick_after:
+                self.kick_until = now + self.kick_s
+        sign = math.copysign(1., requested)
+        out = abs(requested)
+        if self.pulse_rps > 0. and out < self.pulse_rps:
+            phase = ((now - self.moving_since) % self.period) / self.period
+            out = self.pulse_rps if phase < out / self.pulse_rps else 0.
+        if self.kick_rps > 0. and now < self.kick_until:
+            out = max(out, self.kick_rps)
+        return sign * out

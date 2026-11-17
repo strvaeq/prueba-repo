@@ -1,0 +1,35 @@
+# Open v5 on the team's car with the IMX708 camera (picam): car.launch loads it by itself for strategy:=robotek_open
+# (strategy_params auto, camera_driver picam by default), with motor_max_rps auto = 6.7.
+# These values gave a complete round, 3 laps in 30.9 s from Start to DONE, the coach's "perfect" one (11 nov 2026,
+# 17:29, new motor, 54:30 gears; no judge); in the lab (real_v4) the same speeds, look-ahead and island gap had no contact
+# in std12. The 14:50 record (23.4 s) used cruise 1.02 without the corner speed; it crashed in the fields with a narrow
+# corner.
+strategy:
+  ros__parameters:
+    inner_gap: 0.50          # m from the island on the straights (lab real_v4: 0.50 with corner_speed was best)
+    wall_heading_gain: 0.3
+    corner_speed: 0.64          # m/s in every corner, the last too (-25 % of cruise)
+    turn_tolerance: 0.30        # rad (~17 deg): end each corner's arc earlier; 0.12 overshot into the island with corner_lookahead 0.55 uncapped (coach, 11 nov 2026)
+    lateral_kp: 1.0             # rad per m off inner_gap (was 0.3): line up with the island faster after a corner (coach, 11 nov 2026)
+    scan_max_age: 1.0           # s: brake only if the LiDAR is really gone (its gaps last <= 0.5 s; the gyro and the
+                                # front-wall dead reckoning bridge them; 12 nov 2026 lab)
+    detect_crash: false         # off by default (the coach, 11 nov 2026). detect_crash:=true at launch: on a crash it stops,
+                                # resets the board and saves the last 5 s to ~/runs/<round>/crash-<time>.json
+    brake_margin: 0.35          # brake 0.2 m earlier than the 0.15 default (coach, 11 nov 2026)
+    corner_lookahead: 0.35      # m (at most the island distance - 0.08 m)
+    finish_speed: 0.32          # -20 % of 0.4
+    cruise_speed: 0.85          # m/s on the straights (11 nov 2026, 17:29 round)
+    finish_lead: 0.14           # m before the start's front range (0.25 with base_adapter's ramp; FINISH and DONE now
+                                # stop without it and the car stops ~11 cm sooner; 12 nov 2026 lab, check on the car)
+    direction_fallback: ccw
+    vision_blue_h_min: 95
+    vision_blue_h_max: 135
+    vision_blue_s_min: 60
+    vision_blue_v_min: 60
+    vision_orange_h_min: 2
+    vision_orange_h_max: 25
+    vision_orange_s_min: 60
+    vision_orange_v_min: 60
+    vision_wall_v_max: 70
+    vision_line_contrast: 30
+    vision_line_tint: 8
