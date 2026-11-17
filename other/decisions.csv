@@ -1,1 +1,1 @@
-id,date,problem,alternatives,decision,test,result,limitation
+decision_id,date,owner,problem,constraints,alternatives,chosen_change,test_id,result,limitation

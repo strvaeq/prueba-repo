@@ -146,7 +146,7 @@ private:
   std::string GetCurrentTime();
 
   inline uint64_t GetCurrentLocalTimeStamp() {
-    //// 获取系统时间戳
+    //// Get the system timestamp
     std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> tp = 
       std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now());
     auto tmp = std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch());
@@ -170,7 +170,7 @@ private:
 
 };
 
-//// 以下功能支持所处文件、函数、行号信息的打印
+//// The following functions include file, function and line information.
 #define  LOG(level,format,...)   LogModule::GetInstance(__FILE__, __FUNCTION__, __LINE__,level)->LogPrintInf(format,__VA_ARGS__);
 #ifdef ENABLE_LOG_DIS_OUTPUT
 #define  LD_LOG_DEBUG(format,...)   LOG(LogModule::DEBUG_LEVEL,format,__VA_ARGS__)
@@ -183,7 +183,7 @@ private:
 #define  LD_LOG_WARN(format,...)    do {} while(0)
 #define  LD_LOG_ERROR(format,...)   do {} while(0)
 #endif
-//// 以下功能不支持所处文件、函数、行号信息的打印
+//// The following functions omit file, function and line information.
 #ifdef ENABLE_LOG_DIS_OUTPUT
 #define  LOG_NO_DESCRI(level,format,...)   LogModule::GetInstance(level)->LogPrintNoLocationInf(format,__VA_ARGS__);
 #define  LDS_LOG_DEBUG(format,...)   LOG_NO_DESCRI(LogModule::DEBUG_LEVEL,format,__VA_ARGS__)       

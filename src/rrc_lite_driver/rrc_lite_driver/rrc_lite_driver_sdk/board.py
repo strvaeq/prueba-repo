@@ -9,7 +9,7 @@ import serial
 import threading
 
 class PacketControllerState(enum.IntEnum):
-    # 通信协议的格式(the format of the communication protocol)
+    # the format of the communication protocol
     # 0xAA 0x55 Length Function ID Data Checksum
     PACKET_CONTROLLER_STATE_STARTBYTE1 = 0
     PACKET_CONTROLLER_STATE_STARTBYTE2 = 1
@@ -20,23 +20,23 @@ class PacketControllerState(enum.IntEnum):
     PACKET_CONTROLLER_STATE_CHECKSUM = 6
 
 class PacketFunction(enum.IntEnum):
-    # 可通过串口实现的控制功能(achieve control function via the serial port)
+    # achieve control function via the serial port
     PACKET_FUNC_SYS = 0
-    PACKET_FUNC_LED = 1  # LED控制(LED control)
-    PACKET_FUNC_BUZZER = 2  # 蜂鸣器控制(buzzer control)
-    PACKET_FUNC_MOTOR = 3  # 电机控制(motor control)
-    PACKET_FUNC_PWM_SERVO = 4  # PWM舵机控制, 板子上从里到外依次为1-4(PWM servo control. The servos on the board are numbered 1 to 4 from inside to outside)
-    PACKET_FUNC_BUS_SERVO = 5  # 总线舵机控制(bus servo control)
-    PACKET_FUNC_KEY = 6  # 按键获取(obtain button)
-    PACKET_FUNC_IMU = 7  # IMU获取(obtain IMU)
-    PACKET_FUNC_GAMEPAD = 8  # 手柄获取(obtain handle)
-    PACKET_FUNC_SBUS = 9  # 航模遥控获取(obtain model aircraft remote control)
-    PACKET_FUNC_OLED = 10  # OLED 显示内容设置(set OLED display content)
+    PACKET_FUNC_LED = 1  # LED control
+    PACKET_FUNC_BUZZER = 2  # buzzer control
+    PACKET_FUNC_MOTOR = 3  # motor control
+    PACKET_FUNC_PWM_SERVO = 4  # PWM servo control. The servos on the board are numbered 1 to 4 from inside to outside
+    PACKET_FUNC_BUS_SERVO = 5  # bus servo control
+    PACKET_FUNC_KEY = 6  # obtain button
+    PACKET_FUNC_IMU = 7  # obtain IMU
+    PACKET_FUNC_GAMEPAD = 8  # obtain handle
+    PACKET_FUNC_SBUS = 9  # obtain model aircraft remote control
+    PACKET_FUNC_OLED = 10  # set OLED display content
     PACKET_FUNC_RGB = 11  # RGB
     PACKET_FUNC_NONE = 12
 
 class PacketReportKeyEvents(enum.IntEnum):
-    # 按键的不同状态(different button status)
+    # different button status
     KEY_EVENT_PRESSED = 0x01
     KEY_EVENT_LONGPRESS = 0x02
     KEY_EVENT_LONGPRESS_REPEAT = 0x04
@@ -66,7 +66,7 @@ crc8_table = [
 ]
 
 def checksum_crc8(data):
-    # 校验(check)
+    # check
     check = 0
     for b in data:
         check = crc8_table[check ^ b]
@@ -116,7 +116,7 @@ class Board:
         self._reconnect_lock = threading.Lock()
         self._last_reconnect_try = 0.0
 
-        # 队列用来存储数据(use queue to store data)
+        # use queue to store data
         self.sys_queue = queue.Queue(maxsize=1)
         self.bus_servo_queue = queue.Queue(maxsize=1)
         self.pwm_servo_queue = queue.Queue(maxsize=1)
@@ -182,7 +182,7 @@ class Board:
             pass
 
     def get_battery(self):
-        # 获取电压，单位mAh(obtain voltage, which is in the unit of mAh)
+        # obtain voltage, which is in the unit of mAh
         if self.enable_recv:
             try:
                 data = self.sys_queue.get(block=False)
@@ -197,7 +197,7 @@ class Board:
             return None
 
     def get_button(self):
-        # 获取按键key1， key2状态，返回按键ID(1表示按键1，2表示按键2)和状态(0表示按下，1表示松开)(Get the status of buttons 1 and 2, and return the button ID (1 for key1, and 2 for key2) and status (0 for pressed, and 1 for released))
+        # Button IDs and pressed/released status (Get the status of buttons 1 and 2, and return the button ID (1 for key1, and 2 for key2) and status (0 for pressed, and 1 for released))
         if self.enable_recv:
             try:
                 data = self.key_queue.get(block=False)
@@ -214,7 +214,7 @@ class Board:
             return None
 
     def get_imu(self):
-        # 获取IMU数据，返回ax, ay, az, gx, gy, gz(obtain IMU data to return ax, ay, az, gx, gy, and gz)
+        # obtain IMU data to return ax, ay, az, gx, gy, and gz
         if self.enable_recv:
             try:
                 # ax, ay, az, gx, gy, gz
@@ -226,7 +226,7 @@ class Board:
             return None
 
     def get_gamepad(self):
-        # 获取手柄数据(obtain handle data)
+        # obtain handle data
         if self.enable_recv:
             try:
                 # buttons, hat, lx, ly, rx, ry
@@ -422,7 +422,7 @@ class Board:
         self.buf_write(PacketFunction.PACKET_FUNC_RGB , data)
         
     def set_oled_text(self, line, text):
-        data = [line, len(text)] # 子命令为 0x01 设置 SSID, 第二个字节是字符串长度，该长度包含'\0'字符串结束符(The sub-command 0x01 is used to set the SSID. The second byte is the length of the string, which includes the '\0' string termination character)
+        data = [line, len(text)] # The sub-command 0x01 is used to set the SSID. The second byte is the length of the string, which includes the '\0' string termination character
         data.extend(bytes(text, encoding='utf-8'))
         self.buf_write(PacketFunction.PACKET_FUNC_OLED, data)
 
@@ -595,7 +595,7 @@ class Board:
                                 if func in self.parsers:
                                     self.parsers[func](data)
                             else:
-                                print("校验失败")
+                                print("Checksum validation failed")
                             self.state = PacketControllerState.PACKET_CONTROLLER_STATE_STARTBYTE1
                             continue
             else:

@@ -1,77 +1,145 @@
-# Robotek — WRO 2026 Future Engineers
+<p align="center"><img src="assets/cover.svg" alt="Renkay and Sami — Robotek Peru, WRO 2026 Future Engineers" width="100%"></p>
 
-Engineering repository prepared from the coach baseline. Source code is included; physical evidence and team-specific validation remain incomplete. This is a working engineering draft, not a certified competition submission.
+<p align="center"><strong>Design · Sense · Decide · Drive · Learn</strong></p>
+<p align="center"><a href="#the-vehicle">Vehicle</a> · <a href="#mechanical-design">Mechanics</a> · <a href="#power-and-sensing">Electronics</a> · <a href="#software-and-strategy">Strategy</a> · <a href="#reproduce-the-system">Build and run</a> · <a href="docs/09-evaluation-guide.md">Judge's guide</a></p>
 
-## Team and vehicle
+# Renkay — WRO 2026 Future Engineers
 
-Team members, roles, institution, event, date, vehicle revision and current photographs: PENDING.
+Sami is the autonomous vehicle documented by Renkay, part of Robotek Perú. Our previous repository records a project developed through successive mechanical, electronic and software revisions. This edition brings the current coach reference into a single engineering narrative: how the car moves, what it can observe, how its software chooses a maneuver and how those decisions can be tested.
 
-## Technical baseline
+The engineering baseline is the coach's `robotek-learn` revision `c5de794342b5da46725ba9a6994fb73bbebd0ff0`. It includes the Open v5 and Obstacle v3 strategies, hardware adapters, simulation packages and tests. The team's clarification is reflected throughout: the earlier external motor driver has been replaced by an encoder motor controlled through the HiWonder RRC Lite. The encoder measures rotation; the board provides the motor's power control.
 
-The team identifies renzodamgo/robotek-learn as the reference for the current car. Reviewed baseline: `c5de794342b5da46725ba9a6994fb73bbebd0ff0`. The motor has an encoder and is controlled through the RRC Lite board; the external TB6612 belongs to an earlier configuration. The encoder measures rotation; power electronics still drive the motor.
+Team and vehicle names are carried forward from the team's previous documentation. The names, photographs and measurements that change between seasons must be confirmed for the submitted vehicle. The [evidence register](docs/10-evidence-register.md) makes that distinction explicit without interrupting the technical explanations.
 
-The baseline robot.yaml selects `motor_backend: rrc`, `rrc_motor_port: 2`, `motor_rps_per_mps: 7.0`, `motor_max_rps: 3.4` and `wheelbase: 0.1174`. These are source values, not new measurements. Launch files can override them. Historical comments mention several gear ratios; the latest calibration comment identifies 1:1 gears. Confirm the deployed revision before publishing these as final vehicle specifications.
+## Explore the project
 
-## Documentation
+| What you want to understand | Read |
+|---|---|
+| Vehicle layout, steering and drivetrain | [Mechanical design](docs/01-mechanical-design.md) |
+| Power architecture, sensors and their limitations | [Power and sensing](docs/02-power-and-sensing.md) |
+| ROS packages, messages and hardware interfaces | [Software architecture](docs/03-software-architecture.md) |
+| Three laps without traffic signs | [Open challenge](docs/04-open-challenge.md) |
+| Traffic signs, corners and parking | [Obstacle challenge](docs/05-obstacle-challenge.md) |
+| Why the design changed | [Engineering decisions](docs/06-engineering-decisions.md) |
+| Assembly, installation and calibration | [Reproduction guide](docs/07-reproduction.md) |
+| Test procedures and interpretation | [Testing and results](docs/08-testing-and-results.md) |
+| Evidence for each rubric criterion | [Evaluation guide](docs/09-evaluation-guide.md) |
+| Team, provenance and reference practices | [Team](docs/11-team.md) · [References](docs/12-references.md) |
 
-- [Mobility & Mechanical Design](docs/mobility.md)
-- [Power & Sensor Architecture](docs/power-and-sensors.md)
-- [Software Architecture & Obstacle Strategy](docs/software.md)
-- [Systems Thinking & Engineering Decisions](docs/engineering.md)
-- [Reproducibility & GitHub Quality](docs/reproducibility.md)
-- [Evidence map](docs/rubric-evidence.md)
-- [Testing](docs/testing.md)
+## The vehicle
 
-## Source and reproduction
+Sami uses an Ackermann-type front steering mechanism and a driven axle. A Raspberry Pi runs the perception and strategy software; a RRC Lite connects that software to the motor, steering servo and board feedback. A LD19 LiDAR observes the surrounding geometry, the IMU supplies angular-rate measurements and the camera contributes colour information. These sensors have complementary roles: a range measurement can locate an object without identifying its colour, while a colour observation alone does not supply reliable metric clearance.
 
-The complete tracked coach snapshot is included in src/, tools/, course/ and reto/. It includes Open v5 and Obstacle v3. Confirm that its commit matches the vehicle deployment. See [installation](docs/installation.md), [vehicle baseline](docs/current-vehicle.md) and [source map](docs/strategy-map.md). Manufacturing CAD, actual wiring, team evidence and newly recorded results remain pending.
+![Functional architecture](assets/system.svg)
 
-## Credits
+| Subsystem | Current reference | Engineering role |
+|---|---|---|
+| Compute | Raspberry Pi 5, Ubuntu 24.04, ROS 2 Jazzy | Sensor processing and mission execution |
+| Motor interface | RRC Lite, motor port M2 | Board-controlled encoder motor |
+| Drive motor | JGA27-310R, 20:1 gearbox, as identified in the coach configuration | Traction; actual speed depends on gearing and load |
+| Transmission | Latest baseline calibration identifies external 1:1 gears | Couples the motor output to the driven axle |
+| Steering | Servo with measured centre and asymmetric angle mapping | Converts steering requests into wheel angles |
+| LiDAR | LDROBOT LD19 | Walls, free space and candidate signs |
+| Camera | IMX708 Wide car profile | Direction cues and traffic-sign colour |
+| IMU | RRC Lite IMU transformed to the vehicle frame | Relative heading and turning feedback |
+| Rear range | VL53L0X support in the hardware package | Additional rear-distance feedback where installed |
 
-Coach reference: https://github.com/renzodamgo/robotek-learn . Preserve original license files and component-specific notices when importing source. Team authorship and modifications must be stated separately.
+The values above identify the source baseline. A procurement-ready component inventory and the final physical configuration are tracked in [the bill of materials](other/bom.csv) and [the evidence register](docs/10-evidence-register.md).
 
+## Mechanical design
 
-## Engineering explanation and validation plan
+The front wheels steer while the drivetrain supplies longitudinal motion. This keeps the software's steering request separate from its speed request, but also creates a minimum turning radius. The bicycle model used by the software relates wheelbase L, steering angle δ, speed v and yaw rate ω through `ω = v tan(δ) / L`. It is a planning approximation: tyre slip, servo delay and linkage compliance affect the real path.
 
+The hardware configuration uses a 0.1174 m wheelbase and a 19° effective wheel-angle limit. Those values imply an ideal centreline turning radius near 0.34 m. This is a calculation, not a measured clearance guarantee. Obstacle v3 retains its own 0.11883 m planning geometry because its corner table was computed with that model. The distinction and its consequences are explained in [mechanical design](docs/01-mechanical-design.md).
 
-### Mobility & Mechanical Design
+Changing the motor, gearing or steering centre changes the behavior of both challenges. The repository therefore keeps calibration profiles next to their implementation and separates historical parameters from current launch choices. Fabrication assets are indexed in [models](models/README.md); simulation meshes are clearly identified as simulation assets rather than editable manufacturing CAD.
 
-Document chassis dimensions, mass, wheelbase, track width, wheel diameter, mounting, steering geometry and transmission. Include editable CAD, manufacturing drawings and assembly photos. Explain component selection and alternatives. Calculate gear ratio with clearly labelled driver/driven gears, wheel speed and torque assumptions. Measure left/right turning radius, speed and braking distance. Compare revisions under the same conditions; discuss backlash, traction and stability.
+## Power and sensing
 
-### Power & Sensor Architecture
+The compute, sensing and actuator paths have different electrical demands. Motor starting and steering loads can produce peaks that are not represented by an idle current reading. The power budget consequently separates rails, typical consumption, peak consumption and regulator losses. Battery-side demand is calculated from power, not by adding currents measured at different voltages.
 
-Provide a wiring diagram with connector labels, polarity, voltages, signal direction and common grounds. List battery chemistry/capacity, regulators, rated and measured currents, peak loads and runtime. Calculate power per rail (V × A), account for conversion efficiency and compare with source capacity. For each sensor explain function, placement relative to field geometry, blind spots, calibration, uncertainty and failure response. Include camera lighting tests, LiDAR chassis occlusion, IMU axes and encoder limitations.
+![Functional power architecture](assets/power.svg)
 
-### Software Architecture & Obstacle Strategy
+The LiDAR scan adapter removes points outside the usable field of view and applies the car-frame convention. The current hardware configuration sets zero bearing forward, uses a ±110° useful field and rejects returns nearer than 0.12 m. Those values address the mounting and chassis occlusion recorded in the baseline. The IMU adapter maps the board axes to forward, left and up; this is essential because a physically rotated board must not be interpreted as if it lay flat.
 
-Map real packages, nodes, topics, units and update rates. Link each algorithm to its implementation. Draw state transitions with conditions, timeouts and stop behavior. Explain Open start, direction detection, wall following, corners, lap count and finish. Explain Obstacle localization, LiDAR/camera association, colour memory, side selection, corner planning, lot exit and final parking. Describe unknown colours, stale sensors and failed maneuvers. Identify the exact launch command and effective parameters, including launch overrides. Distinguish course solutions from deployed strategies.
+The camera configuration is specific to the selected driver. The IMX708 Wide Obstacle profile uses a 1.78 rad horizontal field of view and calibrated pitch/yaw. The USB-camera correction in `robot.yaml` describes a different image path. Combining their calibration values would produce inconsistent bearings. The [sensor chapter](docs/02-power-and-sensing.md) explains which values belong together.
 
-### Systems Thinking & Engineering Decisions
+## Software and strategy
 
-For every major change record: observed problem, constraints, alternatives, choice, interaction with other subsystems, test, result and remaining limitation. Include changes to motor, gearing, control board, steering and sensor placement. Use measured before/after evidence. Keep a failure register with severity, detection, mitigation and verification. Identify authors and dates; explain coach-provided and team-developed work.
+The source tree contains ROS 2 packages rather than a single monolithic driving script. Sensor drivers acquire data; adapters express that data in the vehicle frame; strategy packages choose motion; the base adapter converts motion to board commands. Package responsibility and topic names are indexed in [the software chapter](docs/03-software-architecture.md).
 
-### Reproducibility & GitHub Quality
+### Open challenge
 
-Include a model-specific bill of materials, editable CAD and manufacturing exports, complete wiring, actual deployed source and configuration, dependencies and versions, installation/build/launch instructions and calibration workflow. Test setup from a clean environment. Record meaningful commits, release notes, test workflow and hardware/software version mapping. Verify all links and media without signing in. Include all programmed components, not just the main strategy.
+Open v5 estimates gyro bias after Start, selects the driving direction and alternates straights with corner arcs. It integrates yaw rate and corrects heading against suitable island-wall observations on straights. Straight progress comes from the changing front-wall range. The presence of a motor encoder does not mean this strategy localizes itself by integrating wheel revolutions.
 
-## Runtime architecture
+![Open mission](assets/open-flow.svg)
 
-The Raspberry Pi runs ROS 2 nodes that acquire LiDAR, IMU and camera information, estimate geometric relationships to the field, choose a maneuver and send motion commands to the hardware adapter. The adapter converts motion requests into steering and motor commands for the RRC Lite. Sensor orientation and steering calibration are part of this interface, not optional presentation details. The relevant source paths are indexed in docs/strategy-map.md.
+Corners require multiple conditions: sufficient travel since the previous turn, a front wall within the turning threshold and an island end that has opened or been confirmed in successive scans. The look-ahead is limited near the island to reduce early turns into the inner wall. The finish compares front range against the recorded starting reference after the required corner count. [Read the algorithm and control equations](docs/04-open-challenge.md).
 
-Open v5 uses gyro heading with wall corrections and measures progress toward the front wall. Its corner and finish conditions are part of the mission implementation. Obstacle v3 adds sign position and colour association, remembered observations, side selection, corner planning and parking. The selected parking profile must be stated explicitly because the supplied source includes multiple approaches and field-specific finishing pulses.
+### Obstacle challenge
 
-## Evidence and performance
+Obstacle v3 localizes against the field walls, groups LiDAR returns into candidate signs and associates those observations with camera colours. It remembers signs by their field seats, chooses the correct passing side and constructs a line and corner maneuver with clearance in mind. Red signs are passed on the right and green signs on the left.
 
-No new physical or simulated performance result is claimed by this packaging work. Inherited result files document their original experiments and retain their original context. Before submitting, identify which results match the present hardware, source revision and launch profile. Record all new attempts, including failures, in other/test-results.csv. Include both driving directions, different layouts, sensor conditions and parking outcomes. Present completion counts with denominators, times and failure categories.
+![Obstacle pipeline](assets/obstacle-flow.svg)
 
-## Engineering history and attribution
+Parking behavior depends on the selected profile. The source includes a search-based parking mode, a fixed maneuver mode and a car round profile with partial parking and calibrated finish pulses. This repository describes those alternatives explicitly; the round profile's pulses should not be presented as a general geometric planner. [Read the parking and recovery explanation](docs/05-obstacle-challenge.md).
 
-Earlier Robotek documentation mixed L298N and TB6612 descriptions and linked current-looking media to a 2025 repository. This repository treats the RRC encoder-motor configuration as the coach baseline and keeps historical material in its original context. The source snapshot has not been rewritten to erase its development history. New team changes should identify the problem, alternatives, chosen change, test and measured effect.
+## Engineering decisions
 
-Original LICENSE, CREDITS.md and component notices are retained. The RRC-derived components have specific upstream notices; do not assume every third-party component is licensed identically. The documentation preparation does not establish independent student authorship of inherited code. Team members should document their contributions and be able to explain the system.
+The project history is useful when it explains a trade-off. Moving to the RRC encoder-motor interface changes the command path and the calibration problem. A steering lookup table addresses a non-linear and asymmetric linkage. Correcting gyro drift with wall observations combines a short-term motion sensor with an external reference. These decisions are connected to code and baseline observations in [the engineering chapter](docs/06-engineering-decisions.md).
 
-## Submission readiness
+Some source configurations intentionally disable protections or diagnostics, including the forward wall guard and Open crash detection. Their presence in the code does not imply that they are active. The failure register distinguishes detection, warning, stopping behavior and unverified assumptions.
 
-The supplied 2026 rubric assesses five categories of six points. The supplied general rules require English documentation for the international event, at least 5000 characters in README.md, team and six-side vehicle photographs, and a YouTube video per challenge with at least 30 seconds of autonomous driving. The repository also needs meaningful historical commits according to the event deadlines, public access and a printed copy for the international final. Confirm exact event dates and applicable updates with the organizer.
+## Reproduce the system
 
-This README exceeds the length threshold, but length alone does not establish compliance. Missing hardware evidence, measurements, identity and reproduction records remain explicit blockers to a final submission. Use docs/rubric-evidence.md to link each criterion to the actual explanation, technical files and validation record. Do not replace missing results with estimates presented as measurements.
+Read [assembly, installation and calibration](docs/07-reproduction.md) before operation. The hardware target is Ubuntu 24.04 arm64 on the Raspberry Pi, with ROS 2 Jazzy. Windows can be used to edit and upload the documentation; it is not the native execution environment for the car.
+
+From the repository root on the supported Pi:
+
+```bash
+bash tools/setup-pi.sh --dry-run
+bash tools/setup-pi.sh
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+bash tools/setup-pi.sh --check
+```
+
+The setup script installs software and configures the computer. Read its output, complete any requested logout/login for device groups, and verify sensor axes and actuator direction with the car supported before a field run.
+
+Select one strategy at a time:
+
+```bash
+bash tools/car-run.sh open
+# Alternative challenge:
+bash tools/car-run.sh obstacle
+```
+
+The default Obstacle command alone does not establish that full-round parking is enabled. The reproduction guide gives the profile path and explains the additional car-specific arguments. The hardware button controls Start; stopping behavior and the launch wrapper are described before the operating procedure.
+
+## Testing and performance
+
+The supplied source contains inherited tests and experimental notes. Those records remain attributed to their original source and conditions. This rebuild has not run the vehicle or produced new physical performance measurements. We do not infer a final success rate from a single successful run or from simulated scoring.
+
+Our [test protocols](docs/08-testing-and-results.md) specify direction, layout, hardware revision, code revision, parameters, battery and observable outcomes. Blank result tables are evidence capture tools, not reported results. Team photographs, current six-view vehicle images and challenge videos are indexed in [team photos](t-photos/README.md), [vehicle photos](v-photos/README.md) and [performance videos](video/video.md).
+
+## Repository map
+
+```text
+README.md               Project narrative and technical overview
+docs/                   Design, strategies, reproduction and evidence
+assets/                 Original vector diagrams
+src/                    Coach-derived ROS packages and package tests
+tools/                  Setup, launch and calibration utilities
+models/                 Manufacturing status and simulation mesh index
+schemes/                Functional architecture and connection register
+t-photos/ · v-photos/    Team and current vehicle image indexes
+video/                  Challenge video register
+other/                  BOM, power budget, calibration and test records
+```
+
+## Credits and development status
+
+Code and calibration baseline: Renzo Damian and Robotek, with LDROBOT and HiWonder-derived components credited in [CREDITS.md](CREDITS.md). The [provenance manifest](PROVENANCE.md) records the exact source revision, the material retained and the language-only changes to vendor comments and one diagnostic message. The original component licenses and notices remain included.
+
+This repository contains a developed technical explanation, runnable-source baseline and defined evidence workflow. Final physical evidence still depends on the documented vehicle: exact current wiring, editable fabrication CAD, current photographs, videos and measured trials. Their status is listed once in [the evidence register](docs/10-evidence-register.md). [The evaluation guide](docs/09-evaluation-guide.md) maps the documentation to the supplied five-criterion 2026 rubric.

@@ -1,1 +1,1 @@
-component,rail_voltage,typical_current,peak_current,source_of_value,regulator_capacity,conditions
+component,rail_voltage_v,typical_current_a,peak_current_a,value_source,efficiency,conditions,evidence_id

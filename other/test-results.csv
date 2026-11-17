@@ -1,1 +1,1 @@
-test_id,date,hardware,commit,profile,challenge,direction,layout,battery,attempt,result,time,parking,failure,evidence
+trial_id,date,operator,environment,hardware_revision,source_commit,profile,direction,layout,battery_v,lighting,surface,result,time_s,contacts,wrong_side,parking,evidence_id

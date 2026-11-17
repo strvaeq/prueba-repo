@@ -1,1 +1,1 @@
-sensor,date,method,reference,raw_value,correction,uncertainty,commit,evidence
+record_id,date,hardware_revision,source_commit,component,method,reference,raw_value,corrected_value,uncertainty,evidence_id

@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #endif
 
-//使用vswprintf会出现奔溃的情况如果，传入数据大于 VA_PARAMETER_MAX 就会出现崩溃
+//vswprintf may crash if the input exceeds VA_PARAMETER_MAX.
 #define  VA_PARAMETER_MAX  (1024 * 2)
 
 LogModule* LogModule::s_plog_module_ = NULL;
@@ -88,7 +88,7 @@ void LogModule::LogPrintInf(const char* format,...) {
 		str_temp.append(GetLevelValue(logInfo_.loglevel));
 		switch (logInfo_.loglevel) {
 			case DEBUG_LEVEL: {
-				//时间戳 uint is seconds
+				//Timestamp uint is seconds
 				char s_stamp[100] = {0};
 				uint64_t timestamp = GetCurrentLocalTimeStamp();
 #ifdef __LP64__
@@ -104,16 +104,16 @@ void LogModule::LogPrintInf(const char* format,...) {
 			}
 				break;
 			default: {
-				//时间   [week month day hours:minutes:seconds year]
+				//Time   [week month day hours:minutes:seconds year]
 				str_temp.append(GetFormatValue(GetCurrentTime()));
 			}
 				break;
 		}
 	
-		//文件名称
+		//File name
 		str_temp.append(GetFormatValue(logInfo_.str_filename));
 		str_temp.append(GetFormatValue(logInfo_.str_funcname));
-		//行号
+		//Line number
 		str_temp.append(GetFormatValue(logInfo_.n_linenumber));
 
 		va_list ptr;
@@ -138,7 +138,7 @@ void LogModule::LogPrintNoLocationInf(const char* format,...) {
 		//LogLevel
 		str_temp.append(GetLevelValue(logInfo_.loglevel));
 		
-		//时间戳 uint is seconds
+		//Timestamp uint is seconds
 		char s_stamp[100] = {0};
 		uint64_t timestamp = GetCurrentLocalTimeStamp();
 #ifdef __LP64__

@@ -4,7 +4,7 @@ import time
 import rclpy
 import signal
 import threading
-import yaml  # 已导入 PyYAML
+import yaml  # PyYAML import
 from ament_index_python.packages import get_package_share_directory
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node

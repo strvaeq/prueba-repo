@@ -1,21 +1,21 @@
-# Créditos
+# Credits and attribution
 
-- **Coche y código de simulación**: Renzo Damian y el equipo Robotek (WRO 2026, Future Engineers).
-- **Mallas del coche** (`src/robotek_description/meshes/*.stl`): diseño del equipo Robotek, publicadas con su permiso.
-- **Textura del tapete** (`src/robotek_gazebo/models/robotek_game_mat/materials/textures/mat.png`): dibujo propio,
-  generado con `tools/make_mat_texture.py`. No contiene arte ni logotipos de la WRO. Las medidas del campo siguen
-  las reglas públicas del reto.
-- **Herramientas**: [ROS 2 Jazzy](https://docs.ros.org/en/jazzy/), [Gazebo Harmonic](https://gazebosim.org/),
-  [ros_gz](https://github.com/gazebosim/ros_gz), [RoboStack](https://robostack.github.io/) para macOS.
-- **Driver del LiDAR LD19** (`src/ldlidar_stl_ros2/`): copia del
-  [ldlidar_stl_ros2 de LDROBOT](https://github.com/ldrobotSensorTeam/ldlidar_stl_ros2) (commit `bf668a8`), licencia MIT,
-  Copyright (c) 2020 SHENZHEN LDROBOT CO., LTD. Su `LICENSE` y los avisos de cada archivo están intactos; solo se
-  aplicaron los dos arreglos de compilación de `src/robotek_hardware/patches/ldlidar_stl_ros2-build.patch`
-  (ver `src/ldlidar_stl_ros2/NOTICE-ROBOTEK.md`).
-- **Driver de la placa RRC Lite** (`src/rrc_lite_driver/`, `src/rrc_lite_msgs/`): basado en
-  [Hiwonder MentorPi](https://github.com/Hiwonder/MentorPi) (commit `fb6d9969`). Incluido con el permiso de Hiwonder,
-  confirmado por el autor del repositorio. El código original no declara licencia; los cambios del equipo Robotek
-  están bajo MIT. Ver el `NOTICE.md` de cada carpeta.
-- **Cámara del coche real**: el nodo `camera_publisher` de `src/robotek_hardware` es del equipo (MIT).
+## Project and technical baseline
 
-WRO® es una marca de World Robot Olympiad Association. Este proyecto no está afiliado a la WRO.
+- Renkay / Robotek Perú: project identity and vehicle history from the supplied previous team repository.
+- Renzo Damian and Robotek: robotek-learn source, car model, strategies, simulation and calibration baseline. Exact revision is recorded in PROVENANCE.md.
+- This editorial edition: rewritten project documentation, original vector diagrams, source/evidence navigation and English language cleanup of vendor comments.
+
+## Third-party components
+
+- LDROBOT LD19 package: the upstream LDROBOT ROS 2 driver, copied by robotek-learn from commit bf668a8, MIT. Original LICENSE and copyright notices remain included. The baseline's build changes and NOTICE-ROBOTEK.md are retained. This edition translates Chinese comments and uses the existing English README section.
+- RRC Lite driver and messages: based on HiWonder MentorPi commit fb6d9969. The coach states that inclusion permission was confirmed with HiWonder. The original does not declare a general license; team changes are MIT. Component NOTICE.md files remain authoritative and included. This edition translates comments and one diagnostic string; it does not claim a new third-party permission.
+- Robot STL meshes: credited by the coach to Robotek and published with permission. They remain simulation resources, not a claim of new editable manufacturing CAD.
+- Course mat texture: coach-generated drawing, with public field dimensions, not WRO artwork.
+- ROS 2 Jazzy, Gazebo Harmonic, ros_gz and associated libraries: credited in package manifests and upstream notices.
+
+## Documentation references
+
+Reference teams are credited in docs/12-references.md. Their methods of explanation informed this edition. Their test data, designs and team media are not presented as Sami's own artifacts.
+
+The root MIT license does not erase the component-specific provenance or grant permissions absent from an original component. WRO is a trademark of World Robot Olympiad Association; this project is not an official WRO publication.

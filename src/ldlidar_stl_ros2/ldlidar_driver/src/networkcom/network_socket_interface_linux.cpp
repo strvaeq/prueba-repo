@@ -151,7 +151,7 @@ bool UDPSocketInterfaceLinux::RecvFromNet(uint8_t *rx_buf , uint32_t rx_buff_len
 
         if (ncd_ == UDP_SERVER) {
           if (!is_server_recv_ack_flag_.load()) { 
-            /////   保存与服务端通信的客户端IP和端口号，仅支持一对一
+            /////   Save client IP and port for communication with the server; one-to-one only.
             client_ip_ = sender_ip;
             client_port_ = sender_port_str;
             is_server_recv_ack_flag_.store(true);

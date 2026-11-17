@@ -41,11 +41,11 @@ enum class LDType {
 };
 
 enum class LidarStatus {
-  NORMAL,     //  雷达正常,可获取点云数据
-  ERROR,      //  表明雷达出现异常错误，可获取雷达反馈的错误码了解具体错误，具体错误由错误码对应二进制值的对应位决定
-  DATA_TIME_OUT, //  雷达点云数据包发布超时
-  DATA_WAIT,  //  雷达点云数据包发布等待
-  STOP,       //  未启动Driver 
+  NORMAL,     //  LiDAR operating normally; point-cloud data available
+  ERROR,      //  LiDAR error; inspect the returned error-code bits for details.
+  DATA_TIME_OUT, //  Point-cloud packet publishing timed out
+  DATA_WAIT,  //  Waiting for point-cloud packets
+  STOP,       //  Driver not started 
 };
 
 struct PointData {

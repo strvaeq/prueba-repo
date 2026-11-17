@@ -1,1 +1,10 @@
-component,model,quantity,function,voltage,source,revision
+component,model,quantity_basis,function,status
+Compute,Raspberry Pi 5,1 in baseline,ROS processing,source identified; installed revision to confirm
+Board,RRC Lite,1 in baseline,motor servo IMU interface,source identified
+Drive motor,JGA27-310R 20:1,1 in baseline,traction,source identified
+LiDAR,LD19,1 in baseline,range geometry,source identified
+Camera,IMX708 Wide,1 in car profile,colour and direction,source identified
+Rear range,VL53L0X,optional physical confirmation,rear distance,driver supported
+Servo,model not supplied,1 steering assembly,front steering,exact model required
+Battery,model not established,not verified,power,model capacity chemistry required
+Regulators,models not established,not verified,power distribution,ratings and wiring required
