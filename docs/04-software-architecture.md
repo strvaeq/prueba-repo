@@ -1,6 +1,6 @@
 # Software architecture and interfaces
 
-![ROS functional pipeline](../assets/system.svg)
+![ROS functional pipeline](../schemes/system-architecture.svg)
 
 ## Responsibility boundaries
 

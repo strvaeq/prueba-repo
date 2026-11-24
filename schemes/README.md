@@ -1,7 +1,7 @@
 # System schemes and connection register
 
-![Functional signals](../assets/system.svg)
-![Functional power](../assets/power.svg)
+![Functional signals](system-architecture.svg)
+![Functional power](power-distribution.svg)
 
 The drawings explain signal and power responsibilities. They deliberately do not invent connector pins or regulator wiring absent from the supplied evidence.
 
@@ -15,4 +15,4 @@ The drawings explain signal and power responsibilities. They deliberately do not
 | Pi ↔ VL53L0X | I2C bus 1, address 0x29 in baseline | Installed sensor, connector pins and rail voltage |
 | Battery → loads | Functional architecture only | Chemistry, capacity, switch, protection and regulators |
 
-The current installation must be photographed and traced before a pin-level electrical drawing can be marked verified. The old L298N diagram is a historical artifact, not a current wiring guide. See [power and sensing](../docs/02-power-and-sensing.md) for the design explanation.
+The current installation must be photographed and traced before a pin-level electrical drawing can be marked verified. The old L298N diagram is a historical artifact, not a current wiring guide. See [power and sensing](../docs/03-power-and-sensor-architecture.md) for the design explanation.

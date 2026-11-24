@@ -49,3 +49,16 @@ The full-round profile includes a low nominal park_pulse_speed, but its example 
 ## Validation cases
 
 Test both directions, signs near corners, adjacent signs of different colours, uncertain colour, sensor interruption, lot departure and final parking. Record wrong-side passages and moved signs separately from completed laps. Distinguish a successful parking-only test, a round without parking and a full round with parking. They answer different questions and should never share an unlabeled success count.
+
+
+## Design choices and trade-offs
+
+### Candidate geometry plus camera colour
+
+LiDAR contributes location and clearance; the camera contributes colour. Memory by seat retains observations across laps. Calibration errors or wrong association can contaminate that memory, so accuracy should be evaluated at association level as well as image-classification level.
+
+The design reduces dependence on seeing a perfect colour patch at the instant of passing. Its limitation is the need for consistent localization, bearings and observation timing.
+
+### Explicit parking profile
+
+The source retains both a geometric search and a fixed-mode solution. The car-round profile adds finish pulses to partial fixed parking. Documenting the actual selected branch avoids attributing a generic algorithm to a calibrated, field-specific maneuver. Compare modes using the same lot dimensions, departure conditions, battery and scoring observations.

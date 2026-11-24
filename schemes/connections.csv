@@ -1,0 +1,6 @@
+source,interface,destination,verification
+Raspberry Pi,/dev/rrc_lite,RRC Lite,source alias - confirm physical connector
+RRC Lite,M2,motor with encoder,confirm leads and feedback pinout on vehicle
+RRC Lite,servo output,steering servo,verify channel and rail
+LD19,/dev/ldlidar,Raspberry Pi,verify adapter and supply
+IMX708,camera ribbon,Raspberry Pi,confirm installed camera profile

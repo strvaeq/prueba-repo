@@ -1,6 +1,10 @@
 # Changelog
 
-## Editorial rebuild
+## Documentation revision · 2026-11-23
+
+Added the eleven illustrated revisions from the team archive, an introduction to the challenge, design rationale, calibration procedures and prioritized experiments. Reorganized the main reading route into ten chapters and indexed the submission evidence.
+
+## Earlier editorial rebuild
 
 - Replaced the checklist-style README with a vehicle narrative, source-linked engineering chapters and original vector diagrams.
 - Added actual Open v5 control reasoning and explicit Obstacle parking-mode distinctions.

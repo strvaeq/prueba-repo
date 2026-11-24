@@ -66,7 +66,7 @@ bash tools/car-run.sh obstacle start_lot:=true \
   lot_exit_steps:='L+0.25 R-0.3 L+0.25 R-0.3 L+0.25 R-0.3 C-0.2'
 ```
 
-This example differs from the baseline robot.yaml conversion of 7.0 and explicitly changes minimum speed and lot exit. Review [parking](05-obstacle-challenge.md) before using it. Record all overrides when reporting a result.
+This example differs from the baseline robot.yaml conversion of 7.0 and explicitly changes minimum speed and lot exit. Review [parking](06-obstacle-challenge-and-parking.md) before using it. Record all overrides when reporting a result.
 
 ## Record the running configuration
 
@@ -100,4 +100,4 @@ ros2 launch robotek_course sim.launch.py
 
 Use the source's round launch arguments for the selected strategy and environment. Package tests are retained under each package's test directory. A local pure-logic run can use `python3 -m pytest src/robotek_open/test src/robotek_obstacle_v3/test` after the relevant package imports/dependencies are configured. These commands are documented; they were not executed on a ROS-equipped machine as part of this rebuild.
 
-A clean-machine reconstruction is complete only when another person can install, connect, calibrate and run the documented revision using the supplied artifacts. The missing physical artifacts are tracked in [the evidence register](10-evidence-register.md).
+A clean-machine reconstruction is complete only when another person can install, connect, calibrate and run the documented revision using the supplied artifacts. The missing physical artifacts are tracked in [the evidence register](../other/evidence.md).

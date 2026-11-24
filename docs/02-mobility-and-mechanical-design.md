@@ -1,6 +1,12 @@
 # Mechanical design and mobility
 
-[Project overview](../README.md) · [Next: power and sensing](02-power-and-sensing.md)
+[Project overview](../README.md) · [Next: power and sensing](03-power-and-sensor-architecture.md)
+
+## Why Ackermann steering?
+
+Rule 11.3 in the supplied 2026 international rules calls for four wheels, a driving axle and one steering actuator. Ackermann geometry is a design choice. In a bend, the inner front wheel follows a smaller circle and needs a larger steering angle than the outer wheel. The linkage couples both front wheels to one servo. Its benefit depends on the actual tie-rod geometry and available wheel clearance.
+
+Renkay first explored wheel movement with cardboard. On V8 the servo was mounted vertically to gain room and steering travel. On V9 the rack position changed because it contacted the servo. These physical changes explain why packaging and linkage travel matter for Sami. A paired left/right turning test connects the design to the clearance available at a corner. [Version photographs](01-vehicle-design-history.md) · [Test protocol](08-testing-and-results.md)
 
 ## Layout and steering model
 
@@ -49,7 +55,7 @@ Battery position and component mounting affect load transfer, tyre grip and stee
 
 The manufacturing register is in [models](../models/README.md). The provided URDF and STL meshes support simulation and geometry inspection. They do not establish the fasteners, tolerances, material or editable design needed to reproduce the physical vehicle.
 
-Use test M01 to measure straight deviation, M02 for left/right turning radius and M03 for braking distance at multiple speeds. Repeat after a gear, servo-linkage or tyre change. The [test chapter](08-testing-and-results.md) defines the procedures and the [evidence register](10-evidence-register.md) records the still-unavailable physical artifacts.
+Use test M01 to measure straight deviation, M02 for left/right turning radius and M03 for braking distance at multiple speeds. Repeat after a gear, servo-linkage or tyre change. The [test chapter](08-testing-and-results.md) defines the procedures and the [evidence register](../other/evidence.md) records the still-unavailable physical artifacts.
 
 ## Source
 
@@ -57,3 +63,18 @@ Use test M01 to measure straight deviation, M02 for left/right turning radius an
 - [Obstacle planning geometry](../src/robotek_obstacle_v3/robotek_obstacle_v3/car.py)
 - [Measured hardware mappings](../src/robotek_hardware/config/robot.yaml)
 - [Adapter conversion logic](../src/robotek_hardware/robotek_hardware/mapping.py)
+
+
+## Design choices and trade-offs
+
+### Gearing selected for the useful speed range
+
+Earlier comments mention speed-up and reduction gear pairs; the latest calibration identifies 1:1. The choice affects start reliability and low-speed parking as well as Open speed. The software conversion and minimum-rps setting must be recalibrated after a physical gear change. Holding the command conversion fixed would mix mechanical and software versions.
+
+An appropriate comparison measures several fixed-distance straight runs, full-lock starts and braking tests with the same battery range. Report both mean behavior and failures to start. This comparison is specified, but no fabricated before/after result is inserted.
+
+### Measured steering mapping instead of symmetric assumptions
+
+The servo centre and left/right lookup tables reflect non-linearity and asymmetry. The limiting side determines the common usable angle. This reduces the mismatch between a commanded wheel angle and the actual linkage response, at the cost of calibration effort and sensitivity to mechanical reassembly.
+
+Changing the horn position, tie-rod adjustment or servo mount requires a new calibration. A steering table is a property of the assembled mechanism, not merely a reusable software constant.

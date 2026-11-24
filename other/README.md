@@ -2,9 +2,9 @@
 
 | Register | Meaning |
 |---|---|
-| [bom.csv](bom.csv) | Source-backed component identification and procurement gaps |
+| [bill-of-materials.csv](bill-of-materials.csv) | Source-backed component identification and procurement gaps |
 | [power-budget.csv](power-budget.csv) | Measured/rated consumption and rail-level calculations |
-| [calibration.csv](calibration.csv) | Calibration procedure and raw/corrected observations |
+| [calibration-records.csv](calibration-records.csv) | Calibration procedure and raw/corrected observations |
 | [test-results.csv](test-results.csv) | Physical or simulated attempts with explicit environment |
 | [decisions.csv](decisions.csv) | Problems, alternatives, changes and measured outcomes |
 | [reference-snapshots.json](reference-snapshots.json) | Exact locally inspected reference commits |

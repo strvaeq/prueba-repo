@@ -1,12 +1,12 @@
 # Power and sensor architecture
 
-[Mechanics](01-mechanical-design.md) · [Software](03-software-architecture.md)
+[Mechanics](02-mobility-and-mechanical-design.md) · [Software](04-software-architecture.md)
 
 ## Power paths and limits of the available evidence
 
 The reference architecture contains a battery-powered actuator controller and a Raspberry Pi with sensing peripherals. The historical team documentation describes a 7.4 V battery, but its wiring mixes older motor-driver configurations. It cannot establish the present battery chemistry, capacity, regulator models or exact wiring by itself. The diagram below is consequently a functional power/signal overview, not a pin-level construction drawing.
 
-![Functional power distribution](../assets/power.svg)
+![Functional power distribution](../schemes/power-distribution.svg)
 
 The current command path uses RRC Lite for the encoder motor. L298N and TB6612 descriptions belong to previous assemblies. Driver software for the LiDAR and control board is still required; the word “driver” can describe software or motor-power electronics, so those meanings are distinguished throughout this repository.
 
@@ -57,3 +57,12 @@ VL53L0X rear-range support includes a measured correction table and reconnection
 | Open crash detector | Disabled by selected profile | Crash recording/protection is optional, not always active |
 
 Detailed physical connections are tracked in [schemes](../schemes/README.md). This chapter explains the architecture that the verified wiring drawing must implement.
+
+
+## Design choices and trade-offs
+
+### Encoder motor through RRC Lite
+
+The previous documentation alternates between L298N and TB6612. The current source selects RRC motor control and M2. Consolidating motor control in the board changes the command interface from external PWM percentages to board speed requests. The encoder is feedback for that controller, while vehicle localization remains sensor/strategy-specific.
+
+The practical trade-off is a more integrated interface with a board-specific motor/encoder model. The source records attempts involving motor types, signs and zero-speed behavior. The current configuration avoids sending a motor type and disables the earlier alternating-brake/reset workaround. A reproduction procedure must verify actual direction and stopping response rather than transplant an earlier motor-type setting.

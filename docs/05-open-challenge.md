@@ -51,3 +51,12 @@ The selected finish lead is 0.14 m and finish_speed is 0.32 m/s. Actual stopping
 | Different battery/load | Same board command may yield different physical speed | Time, braking distance and final stop position |
 
 The current profile allows a scan age up to 1 s in its documented bridge logic and disables crash detection. Those choices are deployment trade-offs, not general guarantees. They should be assessed with recorded runs rather than silently carried forward as evidence of robustness.
+
+
+## Design choices and trade-offs
+
+### Gyro integration corrected by wall geometry
+
+The gyro offers frequent relative-turn measurements but accumulates error; walls provide an external geometric reference on suitable straights. Bounded wall-heading correction combines them. The gate avoids applying an unreliable fit during an arc or treating a large discrepancy as ordinary drift.
+
+This also demonstrates subsystem interaction: sensor placement and field visibility affect the correction, which affects corner timing and therefore mechanical clearance.
